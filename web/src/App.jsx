@@ -110,6 +110,9 @@ export default function App() {
         </Pill>
         <Pill ok={status.llm} title="Contrast / Situation / Naturalness cards">claude</Pill>
         <span className="pill">{status.corpusLines.toLocaleString()} lines mined</span>
+        <span className="pill" title="converted media held in cache/ — safe to delete anytime (npm run clean)">
+          {(status.cacheBytes / 1e9).toFixed(1)} GB cache
+        </span>
         <span className="spacer" />
         {current?.tracks?.length > 1 ? (
           <select value={trackIndex} onChange={(e) => setTrackIndex(Number(e.target.value))}>

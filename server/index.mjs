@@ -31,6 +31,7 @@ app.get('/api/status', wrap(async (_req, res) => {
     dictReady: dictReady(),
     corpusLines: corpusSize(),
     ffmpeg: media.ffmpegAvailable(),
+    cacheBytes: media.cacheSize(),
     llm: llmAvailable(),
     anki,
     deckName: config.deckName,
@@ -52,7 +53,7 @@ app.get('/api/media/:id', wrap(async (req, res) => {
   const abs = media.pathFor(req.params.id);
   res.json({
     id: req.params.id,
-    title: path.basename(abs, path.extname(abs)),
+    title: media.displayTitle(abs),
     isVideo: media.VIDEO_EXTS.includes(path.extname(abs).toLowerCase()),
     tracks: await media.subtitleTracks(abs),
   });
@@ -127,7 +128,7 @@ app.post('/api/cards', wrap(async (req, res) => {
   const { cards, skipped, files } = await buildCards({
     types,
     mediaPath: abs,
-    mediaTitle: path.basename(abs, path.extname(abs)),
+    mediaTitle: media.displayTitle(abs),
     cue,
     word,
     entryId,
@@ -158,7 +159,7 @@ app.post('/api/cards/preview', wrap(async (req, res) => {
   const { cards, skipped, files } = await buildCards({
     ...req.body,
     mediaPath: abs,
-    mediaTitle: path.basename(abs, path.extname(abs)),
+    mediaTitle: media.displayTitle(abs),
   });
   for (const f of files) fs.rmSync(f, { force: true });
   res.json({

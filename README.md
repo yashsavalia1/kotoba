@@ -75,10 +75,24 @@ export ANTHROPIC_API_KEY=sk-ant-...
 ## Playback
 
 Anything ffmpeg can demux. Files the browser can already decode are streamed
-directly with range requests; anything else (mkv, ac3, dts, hevc-in-mkv…) is
-remuxed to mp4 on first open — a stream copy, so it is near-instant — and cached
-under `cache/`. Only a genuinely unplayable video codec triggers a real
+directly with range requests; anything else (mkv, ac3, dts, opus, hevc-in-mkv…)
+is remuxed to mp4 on first open — a stream copy, so it is near-instant — and
+cached under `cache/`. Only a genuinely unplayable video codec triggers a real
 transcode, and the UI shows progress for it.
+
+Three things the conversion gets right that ffmpeg's defaults do not:
+
+- **Audio is chosen by language, not by channel count.** On a dual-audio release
+  ffmpeg's default mapping will happily hand you the English dub. The target
+  language comes from `targetLang` in the config.
+- **HEVC is retagged `hvc1`.** The bitstream is identical, but Safari and some
+  Chrome builds refuse the `hev1` sample entry name that ffmpeg writes by default.
+- **Subtitles, attachments and chapters are dropped.** Matroska chapters
+  otherwise land in the mp4 as a stray `bin_data` track.
+
+**The cache grows to roughly the size of what you watch.** A 12-episode BD season
+is ~19 GB converted. The header shows the current size; `npm run clean` empties
+it, and anything deleted is just rebuilt on next open.
 
 | key | |
 |---|---|
@@ -99,6 +113,12 @@ control bar. Clicking a line in the list below jumps to it.
 ## Hovering
 
 Every cue is segmented when the track loads, so hover costs nothing.
+
+Inline furigana is stripped first — Japanese broadcast subtitles write
+`西片(にしかた)`, and left alone the reading is segmented as its own words and
+ends up in every mined sentence. Parenthesised kana is only removed when it
+directly follows kanji, so speaker labels like `（西片）` and stage directions
+like `（ため息）` survive.
 
 Segmentation is Yomitan's approach, not a morphological analyser: longest-match
 against the dictionary, with rule-based deinflection and a part-of-speech check
@@ -205,5 +225,8 @@ npm run e2e
   in its npm script. It runs once.
 - **Bitmap subtitles (PGS, VobSub) are ignored** — there is no text to hover.
   OCR would be a separate project.
+- **Proper nouns are missing.** JMdict has no names, so `西片` segments as
+  西 + 片. jmnedict (same publisher, 13 MB) would fix it at the cost of ~700k
+  entries of place and person names crowding the popup — not loaded by default.
 - **Japanese only.** The deinflection table and JMdict are both language-specific;
   the player, clipping, and Anki layers are not.

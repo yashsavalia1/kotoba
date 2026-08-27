@@ -13,7 +13,8 @@
     "dict": "node --no-warnings --max-old-space-size=6144 scripts/build-dict.mjs",
     "test": "node --no-warnings --test test/*.test.mjs",
     "e2e": "node --no-warnings scripts/e2e.mjs",
-    "mock-anki": "node --no-warnings scripts/mock-anki.mjs"
+    "mock-anki": "node --no-warnings scripts/mock-anki.mjs",
+    "clean": "rm -rf cache/* && echo \"converted-media cache cleared\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.121.0",

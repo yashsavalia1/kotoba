@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { db, dictReady } from '../server/db.mjs';
-import { config } from '../server/config.mjs';
 import { recordCues, collocations, continuations } from '../server/corpus.mjs';
 import { buildCards } from '../server/cards.mjs';
-import { ffmpegAvailable } from '../server/media.mjs';
+import { ffmpegAvailable, displayTitle } from '../server/media.mjs';
 
 const skip = dictReady() ? false : 'dictionary not built - run `npm run dict`';
 const FIXTURE = '__test_fixture__';
@@ -24,6 +24,24 @@ test.before(() => {
   recordCues(FIXTURE, CUES);
 });
 test.after(() => db.exec(`DELETE FROM line WHERE media = '${FIXTURE}'`));
+
+test('library titles keep what distinguishes a file and drop release tags', () => {
+  // Every episode of a season shares a prefix and a suffix; without trimming
+  // they all render as the same truncated string in the sidebar.
+  assert.equal(
+    displayTitle('/m/[washed] Karakai Jouzu no Takagi-san - S01E01 (BD 1080p HEVC Opus).mkv'),
+    'Karakai Jouzu no Takagi-san - S01E01'
+  );
+  assert.equal(
+    displayTitle('/m/[washed] Karakai Jouzu no Takagi-san - S01E12 (BD 1080p HEVC Opus).mkv'),
+    'Karakai Jouzu no Takagi-san - S01E12'
+  );
+  // A parenthesised year is information, not a release tag.
+  assert.equal(displayTitle('/m/Exit 8 (2025) [1080p] [WEBRip].mp4'), 'Exit 8 (2025)');
+  // Nothing to strip means nothing is lost.
+  assert.equal(displayTitle('/m/Show Name - 03.mkv'), 'Show Name - 03');
+  assert.ok(displayTitle('/m/[1080p][HEVC].mkv').length > 0, 'never returns an empty title');
+});
 
 test('corpus records every cue exactly once per index', () => {
   recordCues(FIXTURE, CUES); // idempotent - re-loading a track must not duplicate
@@ -113,7 +131,14 @@ test('rejects a word with no dictionary entry', { skip }, async () => {
   );
 });
 
-const sample = path.join(config.mediaDirs[0], 'Shoujiki S01E01.mkv');
+// Deliberately the repo's own sample file, not config.mediaDirs: pointing the
+// config at a real library must not silently switch these tests off.
+const sample = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'sample',
+  'Shoujiki S01E01.mkv'
+);
 const mediaSkip = skip || (!ffmpegAvailable() && 'ffmpeg not available')
   || (!fs.existsSync(sample) && 'sample media not present');
 

@@ -64,6 +64,29 @@ bottom line
   assert.equal(cues[1].text, 'second');
 });
 
+test('strips inline furigana but keeps speaker labels and stage directions', () => {
+  const cues = parseSubtitles(`1
+00:00:02,544 --> 00:00:04,212
+（西片(にしかた)）フッフッフ…
+
+2
+00:00:05,000 --> 00:00:06,000
+（ため息）
+
+3
+00:00:07,000 --> 00:00:08,000
+高木(たかぎ)さんは意地悪(いじわる)だ
+
+4
+00:00:09,000 --> 00:00:10,000
+これは(たぶん)違う
+`);
+  assert.equal(cues[0].text, '（西片）フッフッフ…', 'reading removed, speaker label kept');
+  assert.equal(cues[1].text, '（ため息）', 'a kanji-bearing label is content, not furigana');
+  assert.equal(cues[2].text, '高木さんは意地悪だ', 'every furigana run on the line is stripped');
+  assert.equal(cues[3].text, 'これは(たぶん)違う', 'kana in parens after kana is not furigana');
+});
+
 test('drops empty cues rather than emitting blank subtitles', () => {
   const cues = parseSubtitles(`1
 00:00:01,000 --> 00:00:02,000

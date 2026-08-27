@@ -17,6 +17,24 @@ const MP4_VIDEO_OK = new Set(['h264', 'hevc', 'av1']);
 const MP4_AUDIO_OK = new Set(['aac', 'mp3']);
 const DIRECT_EXTS = new Set(['.mp4', '.m4v', '.mp3', '.m4a', '.webm', '.ogg', '.opus', '.wav', '.flac']);
 
+// Release names bury the only distinguishing part between identical prefixes
+// and suffixes: every episode of a season renders as the same truncated string
+// in a list. Drop bracketed group tags and parenthesised technical tags, but
+// keep parentheses that carry real information such as a year.
+const TECH = /\b(\d{3,4}p|BD|BDRip|BluRay|WEB|WEBRip|WEB-DL|HDTV|DVD|DVDRip|REMUX|HEVC|AVC|x26[45]|H\.?26[45]|AAC\d?|AC3|EAC3|DTS|FLAC|Opus|10 ?bits?|8 ?bits?|Dual[- ]Audio|MULTi|SCREENER)\b/i;
+
+export function displayTitle(abs) {
+  const stem = path.basename(abs, path.extname(abs));
+  const trimmed = stem
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/\(([^)]*)\)/g, (whole, inner) => (TECH.test(inner) ? ' ' : whole))
+    .replace(/\s*[-_–]\s*$/, '')
+    .replace(/^\s*[-_–]\s*/, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  return trimmed || stem;
+}
+
 export const idFor = (abs) => Buffer.from(abs).toString('base64url');
 export const pathFor = (id) => {
   const abs = Buffer.from(id, 'base64url').toString('utf8');
@@ -67,7 +85,8 @@ export function scanLibrary() {
       const st = fs.statSync(abs);
       return {
         id: idFor(abs),
-        title: path.basename(abs, path.extname(abs)),
+        title: displayTitle(abs),
+        file: path.basename(abs),
         dir: path.relative(path.resolve(config.mediaDirs[0]), path.dirname(abs)) || '.',
         ext: path.extname(abs).toLowerCase(),
         size: st.size,
@@ -140,11 +159,20 @@ const cacheKey = (abs) => {
   return crypto.createHash('sha1').update(`${abs}:${st.size}:${st.mtimeMs}`).digest('hex').slice(0, 16);
 };
 
+/** ISO-639-1 in the config, ISO-639-2 in most containers. */
+const LANG_ALIASES = { ja: ['ja', 'jpn'], en: ['en', 'eng'], ko: ['ko', 'kor'], zh: ['zh', 'chi', 'zho'] };
+
 async function playPlan(abs) {
   const ext = path.extname(abs).toLowerCase();
   const info = await probe(abs);
-  const v = (info.streams ?? []).find((s) => s.codec_type === 'video' && s.disposition?.attached_pic !== 1);
-  const a = (info.streams ?? []).find((s) => s.codec_type === 'audio');
+  const streams = info.streams ?? [];
+  const v = streams.find((s) => s.codec_type === 'video' && s.disposition?.attached_pic !== 1);
+
+  // Dual-audio releases are common, and ffmpeg's default mapping picks by
+  // channel count, not language - which silently hands you the English dub.
+  const audio = streams.filter((s) => s.codec_type === 'audio');
+  const want = LANG_ALIASES[config.targetLang] ?? [config.targetLang];
+  const a = audio.find((s) => want.includes((s.tags?.language ?? '').toLowerCase())) ?? audio[0];
   const duration = Number(info.format?.duration) || 0;
 
   const videoOk = !v || MP4_VIDEO_OK.has(v.codec_name);
@@ -158,7 +186,16 @@ async function playPlan(abs) {
     // Stream-copying is near-instant; a real transcode is the slow path.
     copyOnly: videoOk,
     args: [
+      // Map exactly one video and one audio stream. Without this, ffmpeg also
+      // carries subtitle and attachment streams into the mp4 as data tracks.
+      '-map', `0:${v ? v.index : 'v:0'}`,
+      ...(a ? ['-map', `0:${a.index}`] : []),
+      // Matroska chapters otherwise land in the mp4 as a stray bin_data track.
+      '-sn', '-dn', '-map_chapters', '-1',
       ...(videoOk ? ['-c:v', 'copy'] : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20']),
+      // Safari (and some Chrome builds) refuse HEVC tagged hev1 but accept
+      // hvc1; the bitstream is identical, only the sample entry name differs.
+      ...(v?.codec_name === 'hevc' && videoOk ? ['-tag:v', 'hvc1'] : []),
       ...(audioOk ? ['-c:a', 'copy'] : ['-c:a', 'aac', '-b:a', '192k']),
     ],
   };
@@ -215,6 +252,17 @@ export async function prepare(abs) {
 }
 
 export const convertedPath = (key) => path.join(config.cacheDir, `${key}.mp4`);
+
+/** Total bytes of converted media held in the cache. */
+export function cacheSize() {
+  let total = 0;
+  for (const f of fs.readdirSync(config.cacheDir)) {
+    try {
+      total += fs.statSync(path.join(config.cacheDir, f)).size;
+    } catch { /* raced with a cleanup */ }
+  }
+  return total;
+}
 
 // ------------------------------------------------------- card media extraction
 

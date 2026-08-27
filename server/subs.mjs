@@ -1,11 +1,19 @@
 // Subtitle parsing: SRT, WebVTT and ASS/SSA. All three collapse to the same
 // cue shape: { start, end, text } with times in seconds.
 
+// Japanese broadcast subtitles carry inline furigana - 西片(にしかた) - which
+// would otherwise be segmented as its own words and pollute both the overlay
+// and every mined sentence. Strip a parenthesised run only when it is pure kana
+// AND directly follows kanji; that spares speaker labels like （西片）and
+// stage directions like （ため息）, which contain kanji and are real content.
+const FURIGANA = /([\u4e00-\u9fff\u3005\u3400-\u4dbf]+)[(（]([\u3041-\u309f\u30a0-\u30ff\u30fc]+)[)）]/g;
+
 const stripTags = (s) =>
   s
     .replace(/\{\\[^}]*\}/g, '')      // ASS override blocks: {\an8}, {\i1}
     .replace(/<[^>]+>/g, '')          // SRT/VTT inline HTML
     .replace(/\\[Nnh]/g, '\n')        // ASS line breaks
+    .replace(FURIGANA, '$1')
     .replace(/\r/g, '')
     .trim();
 
