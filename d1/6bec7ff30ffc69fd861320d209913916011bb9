@@ -1,0 +1,38 @@
+web/src/App.jsx
+  s_a6cff45053013b::t_a694d5ca1d08ba 113-115
+test/cards.test.mjs
+  s_a6cff45053013b::t_2df0f6b5799c3c 5,134-141
+  s_a6cff45053013b::t_20283e6a7c51f0 9,28-44
+  s_a6cff45053013b::t_6d6370e7b2464a 45
+package.json
+  s_a6cff45053013b::t_a694d5ca1d08ba 16-17
+test/subs.test.mjs
+  s_a6cff45053013b::t_f568c99dfbeb6f 67-89
+server/subs.mjs
+  s_a6cff45053013b::t_548728915bfc0e 4-10,16
+server/media.mjs
+  s_a6cff45053013b::t_a694d5ca1d08ba 193-194,256-265
+  s_a6cff45053013b::t_7e27e8f944213e 20-37,88-89,162-164,168-175,189-192,196-198
+  s_a6cff45053013b::t_d194072190e27f 266
+server/index.mjs
+  s_a6cff45053013b::t_a694d5ca1d08ba 34
+  s_a6cff45053013b::t_7e27e8f944213e 56,131,162
+README.md
+  s_a6cff45053013b::t_1de7a88687cc21 78-80,83-96,117-122,228-230
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "d16bec7ff30ffc69fd861320d209913916011bb9",
+  "prompts": {},
+  "sessions": {
+    "s_a6cff45053013b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1e4dd0a5-6674-45f1-9e6c-f161b363671d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Yash Savalia <yashsavalia1@gmail.com>"
+    }
+  }
+}
