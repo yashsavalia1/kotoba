@@ -8,12 +8,20 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
+import { getApiKey } from './settings.mjs';
 
-export const llmAvailable = () =>
-  Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
+export const llmAvailable = () => Boolean(getApiKey() || process.env.ANTHROPIC_AUTH_TOKEN);
 
-let client;
-const getClient = () => (client ??= new Anthropic());
+let client = null;
+let clientKey = null;
+const getClient = () => {
+  const key = getApiKey();
+  if (!client || clientKey !== key) {
+    client = key ? new Anthropic({ apiKey: key }) : new Anthropic();
+    clientKey = key;
+  }
+  return client;
+};
 
 const SHAPES = {
   translation: z

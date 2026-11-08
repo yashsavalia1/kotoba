@@ -9,7 +9,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
-import { db } from '../server/db.mjs';
+import { dictDb } from '../src/core/db.mjs';
+
+const db = dictDb();
 
 const RELEASE_API = 'https://api.github.com/repos/scriptin/jmdict-simplified/releases/latest';
 

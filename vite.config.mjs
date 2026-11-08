@@ -6,11 +6,9 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  root: here,
+  root: path.join(here, 'src', 'renderer'),
+  base: './',
   plugins: [react()],
-  server: {
-    port: 5173,
-    proxy: { '/api': { target: 'http://localhost:5174', changeOrigin: true } },
-  },
-  build: { outDir: path.join(here, 'dist'), emptyOutDir: true },
+  server: { port: Number(process.env.KOTOBA_VITE_PORT) || 5173, strictPort: true },
+  build: { outDir: path.resolve(process.env.KOTOBA_RENDERER_DIR || path.join(here, 'out', 'renderer')), emptyOutDir: true },
 });

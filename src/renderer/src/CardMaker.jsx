@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { previewCards, createCards, lookupWord } from './api.js';
+import { previewCards, createCards, lookupWord } from './api/core.js';
 
 const TYPES = [
   ['ContextCloze', 'Context cloze', 'The line as-is on the front; reading, gloss and translation on the back. Tests recognition in a natural sentence.'],
@@ -30,9 +30,9 @@ export default function CardMaker({ ctx, status, onClose, onDone, onError }) {
   useEffect(() => {
     if (entries.length) return;
     lookupWord(ctx.token.text)
-      .then((r) => {
-        setEntries(r.entries);
-        setEntryId(r.entries[0]?.id ?? null);
+      .then((list) => {
+        setEntries(list);
+        setEntryId(list[0]?.id ?? null);
       })
       .catch((e) => onError(e.message));
   }, [ctx.token.text]);

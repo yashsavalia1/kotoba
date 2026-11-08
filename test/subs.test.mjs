@@ -1,6 +1,7 @@
+import './helpers.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSubtitles } from '../server/subs.mjs';
+import { parseSubtitles } from '../src/core/subs.mjs';
 
 test('parses SRT with comma decimals and multi-line cues', () => {
   const cues = parseSubtitles(`1

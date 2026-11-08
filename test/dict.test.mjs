@@ -1,7 +1,8 @@
+import './helpers.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dictReady } from '../server/db.mjs';
-import { tokenize, lookup, homophones, sharedKanji, glossText } from '../server/dict.mjs';
+import { dictReady } from '../src/core/db.mjs';
+import { tokenize, lookup, homophones, sharedKanji, glossText } from '../src/core/dict.mjs';
 
 const skip = dictReady() ? false : 'dictionary not built - run `npm run dict`';
 

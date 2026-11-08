@@ -1,4 +1,4 @@
-import { db } from './db.mjs';
+import { dictDb } from './db.mjs';
 import { deinflect, posAllows } from './deinflect.mjs';
 
 const MAX_SCAN = 12; // longest substring we will try to match as one word
@@ -9,9 +9,17 @@ const isJP = (ch) => JP.test(ch);
 
 const COLS = 'd.id, d.kanji, d.reading, d.forms, d.pos, d.gloss, d.common';
 
-const qForms = db.prepare(`
+const stmts = new WeakMap();
+const qFormsSql = `
   SELECT ${COLS} FROM dict_form f JOIN dict d ON d.id = f.dict_id WHERE f.form = ?
-`);
+`;
+const qForms = {
+  all(form) {
+    const db = dictDb();
+    if (!stmts.has(db)) stmts.set(db, db.prepare(qFormsSql));
+    return stmts.get(db).all(form);
+  },
+};
 
 /** Every kanji spelling of an entry, tagged with whether that spelling is common. */
 const spellingsOf = (e) =>
@@ -139,7 +147,7 @@ export function sharedKanji(kanji, excludeId, reading = '', limit = 4) {
   if (!chars.length) return [];
   const len = [...kanji].length;
 
-  const q = db.prepare(
+  const q = dictDb().prepare(
     `SELECT DISTINCT f.form, ${COLS} FROM dict_form f JOIN dict d ON d.id = f.dict_id
      WHERE f.form LIKE ? AND length(f.form) = ? AND d.id != ? AND d.reading != ?
        AND d.common = 1

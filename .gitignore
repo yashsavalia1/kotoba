@@ -1,7 +1,10 @@
 node_modules/
-web/dist/
+out/
+dist/
 data/
 cache/
+test-results/
+playwright-report/
 .env
-kotoba.config.json
+.DS_Store
 sample/

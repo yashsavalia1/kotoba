@@ -1,6 +1,7 @@
+import './helpers.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deinflect, posAllows } from '../server/deinflect.mjs';
+import { deinflect, posAllows } from '../src/core/deinflect.mjs';
 
 const forms = (surface) => new Set(deinflect(surface).map((d) => d.text));
 

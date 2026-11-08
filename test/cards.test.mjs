@@ -1,15 +1,18 @@
+import './helpers.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { db, dictReady } from '../server/db.mjs';
-import { recordCues, collocations, continuations } from '../server/corpus.mjs';
-import { buildCards } from '../server/cards.mjs';
-import { ffmpegAvailable, displayTitle } from '../server/media.mjs';
+import { userDb, dictReady } from '../src/core/db.mjs';
+import { SAMPLE } from './helpers.mjs';
+import { recordCues, collocations, continuations } from '../src/core/corpus.mjs';
+import { buildCards } from '../src/core/cards.mjs';
+import { displayTitle } from '../src/core/media.mjs';
+import { ffmpegAvailable } from '../src/core/ffmpeg.mjs';
 
 const skip = dictReady() ? false : 'dictionary not built - run `npm run dict`';
-const FIXTURE = '__test_fixture__';
+const FIXTURE = 999001;
 
 const CUES = [
   '正直に言うと、よく分からない。',
@@ -20,10 +23,10 @@ const CUES = [
 ].map((text, i) => ({ start: i * 4, end: i * 4 + 3, text }));
 
 test.before(() => {
-  db.exec(`DELETE FROM line WHERE media = '${FIXTURE}'`);
+  userDb().prepare('DELETE FROM line WHERE media_id = ?').run(FIXTURE);
   recordCues(FIXTURE, CUES);
 });
-test.after(() => db.exec(`DELETE FROM line WHERE media = '${FIXTURE}'`));
+test.after(() => userDb().prepare('DELETE FROM line WHERE media_id = ?').run(FIXTURE));
 
 test('library titles keep what distinguishes a file and drop release tags', () => {
   // Every episode of a season shares a prefix and a suffix; without trimming
@@ -45,7 +48,7 @@ test('library titles keep what distinguishes a file and drop release tags', () =
 
 test('corpus records every cue exactly once per index', () => {
   recordCues(FIXTURE, CUES); // idempotent - re-loading a track must not duplicate
-  const n = db.prepare('SELECT count(*) AS n FROM line WHERE media = ?').get(FIXTURE).n;
+  const n = userDb().prepare('SELECT count(*) AS n FROM line WHERE media_id = ?').get(FIXTURE).n;
   assert.equal(n, CUES.length);
 });
 
@@ -131,14 +134,7 @@ test('rejects a word with no dictionary entry', { skip }, async () => {
   );
 });
 
-// Deliberately the repo's own sample file, not config.mediaDirs: pointing the
-// config at a real library must not silently switch these tests off.
-const sample = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  'sample',
-  'Shoujiki S01E01.mkv'
-);
+const sample = SAMPLE;
 const mediaSkip = skip || (!ffmpegAvailable() && 'ffmpeg not available')
   || (!fs.existsSync(sample) && 'sample media not present');
 

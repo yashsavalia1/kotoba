@@ -37,7 +37,7 @@ const readVolume = () => {
   }
 };
 
-export default function Player({ url, isVideo, subs, minedWords, onMine, onError }) {
+export default function Player({ url, isVideo, subs, minedWords, onMine, onError, startAt = 0, onProgress }) {
   const video = useRef(null);
   const cueList = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -76,6 +76,14 @@ export default function Player({ url, isVideo, subs, minedWords, onMine, onError
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [cues]);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      const el = video.current;
+      if (el && !el.paused) onProgress?.(el.currentTime, el.duration);
+    }, 5000);
+    return () => clearInterval(t);
+  }, [onProgress]);
 
   useEffect(() => {
     if (video.current) video.current.playbackRate = rate;
@@ -200,8 +208,14 @@ export default function Player({ url, isVideo, subs, minedWords, onMine, onError
           src={url}
           controls={false}
           onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
           onDurationChange={(e) => setDuration(e.currentTarget.duration)}
+          onLoadedMetadata={(e) => {
+            if (startAt > 5 && startAt < e.currentTarget.duration - 10) e.currentTarget.currentTime = startAt;
+          }}
+          onPause={(e) => {
+            setPlaying(false);
+            onProgress?.(e.currentTarget.currentTime, e.currentTarget.duration);
+          }}
           onError={() => onError?.('The browser refused this stream.')}
           onClick={toggle}
           style={isVideo ? undefined : { display: 'none' }}

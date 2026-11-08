@@ -5,32 +5,25 @@
 // ponytail: LIKE '%word%' full scans. At personal scale (a few hundred thousand
 // lines) this is milliseconds. Add FTS5 only if it ever stops being.
 
-import { db } from './db.mjs';
+import { dictDb, userDb, transaction } from './db.mjs';
 import { glossText } from './dict.mjs';
 
 const BOUNDARY = /[、。！？…「」『』（）\s,.!?]/;
 
-const insLine = db.prepare(
-  'INSERT OR REPLACE INTO line (media, idx, start_ms, end_ms, text) VALUES (?, ?, ?, ?, ?)'
-);
-
 export function recordCues(mediaId, cues) {
-  db.exec('BEGIN');
-  try {
-    cues.forEach((c, i) =>
-      insLine.run(mediaId, i, Math.round(c.start * 1000), Math.round(c.end * 1000), c.text)
-    );
-    db.exec('COMMIT');
-  } catch (e) {
-    db.exec('ROLLBACK');
-    throw e;
-  }
+  const db = userDb();
+  const ins = db.prepare(
+    'INSERT OR REPLACE INTO line (media_id, idx, start_ms, end_ms, text) VALUES (?, ?, ?, ?, ?)'
+  );
+  transaction(db, () =>
+    cues.forEach((c, i) => ins.run(mediaId, i, Math.round(c.start * 1000), Math.round(c.end * 1000), c.text))
+  );
 }
 
-export const corpusSize = () => db.prepare('SELECT count(*) AS n FROM line').get().n;
+export const corpusSize = () => userDb().prepare('SELECT count(*) AS n FROM line').get().n;
 
 const linesContaining = (word, limit = 800) =>
-  db
+  userDb()
     .prepare('SELECT text FROM line WHERE text LIKE ? LIMIT ?')
     .all(`%${word}%`, limit)
     .map((r) => r.text);
@@ -53,7 +46,7 @@ export function collocations(word, limit = 8) {
   const seen = new Set([word]);
 
   const fromDict = [];
-  for (const row of db
+  for (const row of dictDb()
     .prepare(
       `SELECT DISTINCT d.id, d.kanji, d.reading, d.gloss FROM dict_form f
        JOIN dict d ON d.id = f.dict_id

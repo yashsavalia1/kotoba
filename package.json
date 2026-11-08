@@ -3,32 +3,35 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Migaku-style sentence mining for your own media files.",
+  "description": "Sentence mining for your own media: a desktop player with hover dictionary and Anki cards.",
   "scripts": {
-    "dev": "concurrently -n server,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
-    "dev:server": "node --watch --no-warnings server/index.mjs",
-    "dev:web": "vite --config web/vite.config.js",
-    "build": "vite build --config web/vite.config.js",
-    "start": "npm run build && node --no-warnings server/index.mjs",
+    "dev": "concurrently -k -n web,app -c magenta,cyan \"vite --config vite.config.mjs\" \"KOTOBA_RENDERER_URL=http://localhost:${KOTOBA_VITE_PORT:-5173} electron .\"",
+    "build": "vite build --config vite.config.mjs",
+    "start": "npm run build && electron .",
     "dict": "node --no-warnings --max-old-space-size=6144 scripts/build-dict.mjs",
     "test": "node --no-warnings --test test/*.test.mjs",
-    "e2e": "node --no-warnings scripts/e2e.mjs",
-    "mock-anki": "node --no-warnings scripts/mock-anki.mjs",
-    "clean": "rm -rf cache/* && echo \"converted-media cache cleared\""
+    "shot": "node scripts/shot.mjs",
+    "mock-anki": "node --no-warnings scripts/mock-anki.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.121.0",
-    "express": "^4.21.2",
+    "ffmpeg-static": "^5.3.0",
+    "ffprobe-static": "^3.1.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "mp4box": "^2.5.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "vite": "^6.0.7"
   },
   "engines": {
     "node": ">=22.13"
-  }
+  },
+  "main": "src/main/main.mjs"
 }

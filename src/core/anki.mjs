@@ -1,9 +1,9 @@
-import { config } from './config.mjs';
+import { getSettings } from './settings.mjs';
 
 async function invoke(action, params = {}) {
   let res;
   try {
-    res = await fetch(config.ankiConnect, {
+    res = await fetch(getSettings().ankiConnect, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ action, version: 6, params }),
@@ -11,7 +11,7 @@ async function invoke(action, params = {}) {
     });
   } catch (cause) {
     throw new Error(
-      `Cannot reach AnkiConnect at ${config.ankiConnect}. Open Anki and install the AnkiConnect add-on (code 2055492159).`,
+      `Cannot reach AnkiConnect at ${getSettings().ankiConnect}. Open Anki and install the AnkiConnect add-on (code 2055492159).`,
       { cause }
     );
   }
@@ -129,7 +129,8 @@ export async function ensureSchema() {
       });
     }
     const decks = new Set(await invoke('deckNames'));
-    if (!decks.has(config.deckName)) await invoke('createDeck', { deck: config.deckName });
+    const { deckName } = getSettings();
+    if (!decks.has(deckName)) await invoke('createDeck', { deck: deckName });
   })();
   return ensured;
 }
@@ -143,7 +144,7 @@ export async function ensureSchema() {
 export async function addNote(type, fields, media = [], tags = []) {
   await ensureSchema();
   const note = {
-    deckName: config.deckName,
+    deckName: getSettings().deckName,
     modelName: modelName(type),
     fields,
     tags: ['kotoba', type, ...tags],
