@@ -1,0 +1,99 @@
+src/core/anki.mjs
+  s_a6cff45053013b::t_3e92fefccc6913 3-23,26,29,33-35,39-47,51,53-54,58-75,79,81-102,193-212,216-217,221,225-228,234,243,254,267-275
+  s_a6cff45053013b::t_f6790d1768f562 50,52,55-57,215,218-220
+  s_a6cff45053013b::t_a6a8975507733c 76-78,80,240-242,244
+  s_a6cff45053013b::t_9b9f840abac9d6 213
+e2e/fixtures.mjs
+  s_a6cff45053013b::t_10b5c014425b06 28-29
+  s_a6cff45053013b::t_b9e411cf1c70b4 1-27,30-81
+e2e/player.spec.mjs
+  s_a6cff45053013b::t_62e695e92b9901 1-47,50-51,58
+  s_a6cff45053013b::t_6d7981a10c4c4a 48-49,52-57
+build/fetch-ffprobe.mjs
+  s_a6cff45053013b::t_6bb42caf4530f3 1-26
+src/core/subs.mjs
+  s_a6cff45053013b::t_68b5a124d09c4f 149
+  s_a6cff45053013b::t_5d3c0b53eb4f07 2-3,10,12-14,17-30,32-38,42-58,60-97,102-115,118-121,124-125,127-128,134-137,139-140,148
+  s_a6cff45053013b::t_60a70a8ca91a8b 144-146
+scripts/shot.mjs
+  s_a6cff45053013b::t_176997da28f42c 26
+e2e/build.setup.mjs
+  s_a6cff45053013b::t_c8ac89f8a1c3a6 1-12
+e2e/packaging.spec.mjs
+  s_a6cff45053013b::t_419226a226b67c 1-20,25-39,42-49
+  s_a6cff45053013b::t_ebd487118e0c27 21-24,40-41
+test/anki.test.mjs
+  s_a6cff45053013b::t_84a087bf7ac8ce 1-72,74-76,79-80,82-83,85-148
+  s_a6cff45053013b::t_f9f5bc04822d5c 73,77-78,81,84
+test/llm.test.mjs
+  s_a6cff45053013b::t_d8cedd17d63227 1-130
+src/core/db.mjs
+  s_a6cff45053013b::t_df92c312bb5e7c 85-87
+test/fixtures/typeset.ass
+  s_a6cff45053013b::t_fc72a64e241bcf 1-23
+src/core/cards.mjs
+  s_a6cff45053013b::t_2ab72a01b469ad 1,9,37-47,49-71,82-83,86,91-100,103,105,107,117-123,130-142,144-158,160,164-165,169-175,178,180-186,196,200,246,255-256,296,352,354,358,372-373
+e2e/ipc.spec.mjs
+  s_a6cff45053013b::t_d6aa39b4d18cbd 1-30,32-70
+  s_a6cff45053013b::t_ebd487118e0c27 31
+test/cards.test.mjs
+  s_a6cff45053013b::t_0fc2e453f6063d 7-8,10-13,23-27,207-305,307,309-352
+  s_a6cff45053013b::t_c3309981affd5c 306,308
+src/main/main.mjs
+  s_a6cff45053013b::t_7802df9d94a2ad 17-24,65-66,120-122
+  s_a6cff45053013b::t_176997da28f42c 14-15,76,79-84,118
+  s_a6cff45053013b::t_df92c312bb5e7c 127
+playwright.config.mjs
+  s_a6cff45053013b::t_febb966d5df989 1-22
+src/core/corpus.mjs
+  s_a6cff45053013b::t_98a53f7a31546f 13-18,20-21,23-29,36-37,103
+  s_a6cff45053013b::t_14bddb26c3f3b2 55
+  s_a6cff45053013b::t_324edefd5bbe48 165,167-172
+  s_a6cff45053013b::t_1f47c5cff0d7bf 5,9,11,59-69,71-89,92-93,101,104,106,108-109,119-120,123-128,130-132,161,164
+  s_a6cff45053013b::t_912723051a166d 49-54,56-58,70
+src/core/llm.mjs
+  s_a6cff45053013b::t_c40b007b0090d5 9,13-14,22-24,30-44,120-150
+test/fixtures/crlf-bom.srt
+  s_a6cff45053013b::t_fc72a64e241bcf 1-22
+src/core/ffmpeg.mjs
+  s_a6cff45053013b::t_5df3165a638285 41,45
+  s_a6cff45053013b::t_fd8d39e36773ac 47-49,65-67
+  s_a6cff45053013b::t_9592c48b42a695 2,7,15,23-40,42-44,46
+package.json
+  s_a6cff45053013b::t_6d4fb2c1791d87 14-17,39-148
+build/icon.svg
+  s_a6cff45053013b::t_5abf14bd3328f4 1-16
+scripts/mock-anki.mjs
+  s_a6cff45053013b::t_c84ccb53a8301d 2-4,8,10-89,91,94-136,139-153
+scripts/build-icon.mjs
+  s_a6cff45053013b::t_ff3a9b9f3fbd62 14-17,41
+  s_a6cff45053013b::t_05a551b902b1ef 1-13,28,36
+  s_a6cff45053013b::t_7059bc1570c83a 18-27,29-35,37-40
+src/core/paths.mjs
+  s_a6cff45053013b::t_df92c312bb5e7c 12,28-29
+  s_a6cff45053013b::t_b69d62547da60a 30
+scripts/pack-dict.mjs
+  s_a6cff45053013b::t_b32d4284fef7c6 1-30
+test/fixtures/cues.vtt
+  s_a6cff45053013b::t_fc72a64e241bcf 1-22
+.gitignore
+  s_a6cff45053013b::t_7a8a8ce06e909c 11-13
+test/subs.test.mjs
+  s_a6cff45053013b::t_ee44ab8429711e 4-7,9-10,109-221
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "723148f415552d13a3951090a5f7ce4c39351e78",
+  "prompts": {},
+  "sessions": {
+    "s_a6cff45053013b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1e4dd0a5-6674-45f1-9e6c-f161b363671d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Yash Savalia <yashsavalia1@gmail.com>"
+    }
+  }
+}
