@@ -7,7 +7,10 @@
 // grammatical type is compatible with `formType`. The result takes `baseType`.
 //   formType = what the INFLECTED string behaves as (so rules can chain)
 //   baseType = what the DEINFLECTED result is
-// '*' on either side means "matches anything".
+// '*' as baseType leaves the result unconstrained. '*' as formType means the
+// rule only applies to an unconstrained string (the surface, or the result of
+// another '*' rule): once a chain has committed to a class, only rules for that
+// class may continue it, so 分からないでし cannot become 分からない via です.
 
 const rules = [];
 // `first` marks a rule that may only fire on the raw surface form, never as a
@@ -60,10 +63,6 @@ for (const [end, r] of Object.entries(GODAN)) {
   R(r.ta + 'ら', end, 'v5');
   R(r.ta + 'り', end, 'v5');
   R(r.te, end, 'v5', 'te');
-  // Contracted te-forms heard constantly in speech: 読んじゃう, 言っちゃった.
-  R(r.te.replace('て', 'ちゃう').replace('で', 'じゃう'), end, 'v5', 'v5');
-  R(r.te.replace('て', 'ちゃった').replace('で', 'じゃった'), end, 'v5');
-  R(r.te.replace('て', 'とく').replace('で', 'どく'), end, 'v5', 'v5');
 }
 // 行く is the one godan verb with an irregular te/ta stem.
 R('行って', '行く', 'v5', 'te');
@@ -77,7 +76,7 @@ for (const [from, base] of [
   ['ない', 'adji'], ['ん', '*'], ['ます', '*'], ['ません', '*'], ['ました', '*'],
   ['ませんでした', '*'], ['ましょう', '*'], ['まして', '*'], ['られる', 'v1'],
   ['させる', 'v1'], ['させられる', 'v1'], ['れる', 'v1'], ['た', '*'], ['たら', '*'],
-  ['たり', '*'], ['て', 'te'], ['ちゃう', 'v5'], ['ちゃった', '*'], ['とく', 'v5'],
+  ['たり', '*'], ['て', 'te'],
   ['れば', '*'], ['よう', '*'], ['ろ', '*'], ['よ', '*'], ['たい', 'adji'],
   ['たがる', 'v5'], ['すぎる', 'v1'], ['そう', '*'], ['ながら', '*'],
 ]) {
@@ -90,7 +89,7 @@ for (const [from, to, ft] of [
   ['しない', 'する', 'adji'], ['します', 'する', '*'], ['しません', 'する', '*'],
   ['しました', 'する', '*'], ['しませんでした', 'する', '*'], ['しましょう', 'する', '*'],
   ['した', 'する', '*'], ['したら', 'する', '*'], ['して', 'する', 'te'],
-  ['しちゃう', 'する', 'v5'], ['される', 'する', 'v1'], ['させる', 'する', 'v1'],
+  ['される', 'する', 'v1'], ['せず', 'する', '*'], ['せずに', 'する', '*'], ['させる', 'する', 'v1'],
   ['させられる', 'する', 'v1'], ['できる', 'する', 'v1'], ['しよう', 'する', '*'],
   ['すれば', 'する', '*'], ['しろ', 'する', '*'], ['せよ', 'する', '*'],
   ['したい', 'する', 'adji'], ['しすぎる', 'する', 'v1'], ['しながら', 'する', '*'],
@@ -135,23 +134,42 @@ for (const t of ['て', 'で']) {
     R(t + suffix, t, 'te', ft);
   }
 }
+// Spoken contractions, rewritten to the full form so the rules above finish the
+// job: 言っちゃった -> 言っちゃう -> 言ってしまう, 書いとく -> 書いておく, 食べちゃ -> 食べては.
+R('ちゃう', 'てしまう', 'v5', 'v5');
+R('じゃう', 'でしまう', 'v5', 'v5');
+R('とく', 'ておく', 'v5', 'v5');
+R('どく', 'でおく', 'v5', 'v5');
+R('ちゃ', 'ては', '*');
+R('じゃ', 'では', '*');
 
 // ------------------------------------------- copula / noun-attached politeness
 
 for (const [from, to, ft] of [
   ['です', '', '*'], ['でした', '', '*'], ['である', '', 'v5'], ['だった', '', '*'],
   ['じゃない', '', 'adji'], ['ではない', '', 'adji'], ['じゃなかった', '', '*'],
-  ['ではありません', '', '*'], ['じゃありません', '', '*'], ['なら', '', '*'],
+  ['ではありません', '', '*'], ['じゃありません', '', '*'], ['なら', '', '*'], ['っす', '', '*'],
 ]) {
   R(from, to, '*', ft);
 }
-for (const from of ['だ', 'な', 'に', 'と', 'の', 'で']) R(from, '', '*', '*', true);
+// A bare particle or copula only folds into the word it follows when that word
+// is the kind it inflects: 素直に, 静かな, 本当の, ゆっくりと. 教科書に and 私と
+// stay two tokens.
+for (const [from, base] of [['だ', 'adjna'], ['な', 'adjna'], ['に', 'adjna'], ['で', 'adjna'], ['と', 'advto'], ['の', 'adjno']]) {
+  R(from, '', base, '*', true);
+}
 // Negative-past on any ない-ending form: 行かなかった -> 行かない.
 R('なかった', 'ない', 'adji');
 R('なくて', 'ない', 'te');
 R('なければ', 'ない', '*');
 R('なきゃ', 'ない', '*');
+R('なくちゃ', 'ない', 'adji');
+R('なくっちゃ', 'ない', 'adji');
+R('なくては', 'ない', 'adji');
+R('なくても', 'ない', 'adji');
+R('ないで', 'ない', 'adji');
 R('ず', 'ない', '*');
+R('ずに', 'ない', 'adji');
 
 const MAX_DEPTH = 6;
 
@@ -172,7 +190,7 @@ export function deinflect(surface) {
       if (node.depth >= MAX_DEPTH) continue;
       for (const rule of rules) {
         if (rule.first && node.depth > 0) continue;
-        if (rule.formType !== '*' && node.type !== null && node.type !== rule.formType) continue;
+        if (node.type !== null && node.type !== rule.formType) continue;
         if (!node.text.endsWith(rule.from)) continue;
         const stem = node.text.slice(0, node.text.length - rule.from.length);
         const text = stem + rule.to;
@@ -211,6 +229,12 @@ export function posAllows(type, pos) {
       return pos.includes('vk');
     case 'adji':
       return pos.some((p) => p === 'adj-i' || p === 'adj-ix');
+    case 'adjna':
+      return pos.includes('adj-na');
+    case 'adjno':
+      return pos.includes('adj-no');
+    case 'advto':
+      return pos.includes('adv-to');
     case 'te':
       return false; // a te-form is never itself a dictionary headword
     default:

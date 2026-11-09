@@ -15,7 +15,7 @@ src/
     playback.mjs     playbackPlan(id): how the renderer should play a file
     subs.mjs         SRT/VTT/ASS parsing → [{ start, end, text }]
     deinflect.mjs    Japanese deinflection rules
-    dict.mjs         lookup, segmentation, homophones, shared-kanji
+    dict.mjs         lookup, segmentation (JMdict words + JMnedict names), homophones, shared-kanji
     corpus.mjs       watched-line index (collocation / prediction cards)
     cards.mjs        the 12 card generators
     anki.mjs         AnkiConnect + the 12 note types
@@ -31,7 +31,13 @@ src/
   preload/preload.cjs   window.kotoba = { invoke, on, pathForFile, platform }
   renderer/      React, built by Vite into out/renderer (or $KOTOBA_RENDERER_DIR)
     src/api/*.js     one module per domain; the only place that names IPC channels
+    src/player/      VideoSurface: the <video> element fed by playback:plan
+    src/ui/          App shell, Home (library), Player, Subtitles, CardMaker, Settings, Shortcuts
 ```
+
+Segmentation quality: `node scripts/eval-segmentation.mjs --dump x.txt` over a subtitle
+folder; diff two dumps to see what a dict.mjs/deinflect.mjs change moved.
+Playback coverage: `node scripts/make-fixtures.mjs` then `node scripts/verify-playback.mjs`.
 
 ## Process boundary
 
