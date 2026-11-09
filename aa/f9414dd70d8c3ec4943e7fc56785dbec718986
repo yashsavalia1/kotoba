@@ -1,0 +1,45 @@
+src/renderer/src/player/VideoSurface.jsx
+  s_87fef2d75ac43e::t_dac6f3ad074c65 7-9,15,20-32,35-58,66-67,69,73,75-76
+  s_87fef2d75ac43e::t_e0cd3f1a21ed79 64-65
+test/playback.test.mjs
+  s_87fef2d75ac43e::t_b769722c4918e3 1-40
+src/renderer/src/player/mse.js
+  s_87fef2d75ac43e::t_38b33f2acaf677 104-105
+  s_87fef2d75ac43e::t_2c24c678076e04 1-103,106-148
+e2e/player.spec.mjs
+  s_87fef2d75ac43e::t_b7ae19e4d1ce22 1-2,62-72
+  s_87fef2d75ac43e::t_2c66068db2a396 3,15,18,73-99
+scripts/verify-playback.mjs
+  s_87fef2d75ac43e::t_2351b9f8c83699 248-249
+src/core/playback.mjs
+  s_87fef2d75ac43e::t_d2182edb3f7445 105
+  s_87fef2d75ac43e::t_5db5c46335a45c 81-83,91-94
+  s_87fef2d75ac43e::t_eab09c68927525 1,3-18,20-22,27-60,63-65,70-72,74-75,77,79-80,102-104,106-112,115-125,128-131,133-134,136-139
+  s_87fef2d75ac43e::t_38b33f2acaf677 23-26,132,135
+  s_87fef2d75ac43e::t_5ba548054cb658 19,113-114,126-127
+src/main/protocol.mjs
+  s_87fef2d75ac43e::t_8973199963d85b 3,5,9,76-109,119-121,123,131-132
+  s_87fef2d75ac43e::t_38b33f2acaf677 8,110-118
+docs/ARCHITECTURE.md
+  s_87fef2d75ac43e::t_bec76a6ab968d5 15,29,34,106
+  s_87fef2d75ac43e::t_eea7f844104493 41-42
+  s_87fef2d75ac43e::t_d7e64902c8534b 65-79
+src/core/library.mjs
+  s_87fef2d75ac43e::t_23274b672ac546 297
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "aaf9414dd70d8c3ec4943e7fc56785dbec718986",
+  "prompts": {},
+  "sessions": {
+    "s_87fef2d75ac43e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29db1b8e-af83-4b10-908b-372aabf84dfe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Yash Savalia <yashsavalia1@gmail.com>"
+    }
+  }
+}
