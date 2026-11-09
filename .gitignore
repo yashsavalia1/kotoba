@@ -8,3 +8,6 @@ playwright-report/
 .env
 .DS_Store
 sample/
+build/dict.db
+build/dict.db.tmp
+build/ffprobe-*/

@@ -11,7 +11,10 @@
     "dict": "node --no-warnings --max-old-space-size=6144 scripts/build-dict.mjs",
     "test": "node --no-warnings --test test/*.test.mjs",
     "shot": "node scripts/shot.mjs",
-    "mock-anki": "node --no-warnings scripts/mock-anki.mjs"
+    "mock-anki": "node --no-warnings scripts/mock-anki.mjs",
+    "pack-dict": "node --no-warnings scripts/pack-dict.mjs",
+    "dist": "node build/fetch-ffprobe.mjs && npm run build && npm run pack-dict && electron-builder --mac --arm64",
+    "e2e": "playwright test --project=dev"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.121.0",
@@ -33,5 +36,114 @@
   "engines": {
     "node": ">=22.13"
   },
-  "main": "src/main/main.mjs"
+  "main": "src/main/main.mjs",
+  "build": {
+    "appId": "com.yashs.kotoba",
+    "productName": "Kotoba",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "!src/renderer/**",
+      "out/renderer/**/*",
+      "package.json",
+      "!node_modules/ffprobe-static/bin/**"
+    ],
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/ffmpeg"
+    ],
+    "extraResources": [
+      {
+        "from": "build/dict.db",
+        "to": "dict.db"
+      },
+      {
+        "from": "build/ffprobe-darwin-arm64/ffprobe",
+        "to": "bin/ffprobe"
+      }
+    ],
+    "fileAssociations": [
+      {
+        "name": "Media",
+        "ext": [
+          "mkv",
+          "mp4",
+          "m4v",
+          "webm",
+          "avi",
+          "mov",
+          "wmv",
+          "flv",
+          "ts",
+          "m2ts",
+          "mts",
+          "ogv",
+          "mpg",
+          "mpeg",
+          "3gp",
+          "vob",
+          "divx",
+          "mp3",
+          "flac",
+          "m4a",
+          "aac",
+          "ogg",
+          "oga",
+          "opus",
+          "wav",
+          "wma",
+          "ac3",
+          "dts",
+          "mka",
+          "ape",
+          "alac",
+          "aiff",
+          "aif"
+        ],
+        "role": "Viewer",
+        "rank": "Alternate"
+      },
+      {
+        "name": "Subtitles",
+        "ext": [
+          "srt",
+          "vtt",
+          "ass",
+          "ssa"
+        ],
+        "role": "Viewer",
+        "rank": "Alternate"
+      }
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.video",
+      "icon": "build/icon.icns",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "darkModeSupport": true
+    },
+    "dmg": {
+      "title": "Kotoba"
+    },
+    "electronLanguages": [
+      "en",
+      "ja"
+    ]
+  }
 }

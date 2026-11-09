@@ -1,0 +1,23 @@
+[Script Info]
+ScriptType: v4.00+
+WrapStyle: 0
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,70,&H00FFFFFF,&H00FF0000,&H00000000,&HA0000000,-1,0,0,0,100,100,0,0,1,3,1,2,10,10,10,1
+Style: Signs,Arial,50,&H00FFFFFF,&H00FF0000,&H00000000,&HA0000000,-1,0,0,0,100,100,0,0,1,3,1,8,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Comment: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,正直、これはコメント。
+Dialogue: 10,0:00:01.00,0:00:03.50,Default,高木,0,0,0,,{\an8}正直、行きたくない。
+Dialogue: 0,0:00:02.00,0:00:04.00,Signs,,0,0,0,,{\pos(640,100)\p1}m 0 0 l 100 0 100 100 0 100{\p0}看板
+Dialogue: 1,0:00:02.00,0:00:04.00,Signs,,0,0,0,,{\pos(640,100)\blur3}看板
+Dialogue: 0,0:00:03.00,0:00:05.00,OP-Romaji,,0,0,0,,{\k20}ko{\k30}i{\kf40}su{\ko10}ru
+Dialogue: 0,0:00:04.00,0:00:06.00,Default,,0,0,0,,一行目\N二行目\h三\n四
+Dialogue: 0,0:00:04.00,0:00:06.00,Default,,0,0,0,,一行目\N二行目\h三\n四
+Dialogue: 0,0:00:07.00,0:00:07.00,Default,,0,0,0,,長さゼロ
+Dialogue: 0,0:00:09.00,0:00:08.00,Default,,0,0,0,,逆さま
+Dialogue: 0,0:00:10.00,0:00:12.00,Default,Sign,0,0,0,,名前で看板
+Dialogue: 0,0:00:10.50,0:00:11.00,Default,,0,0,0,,{\pos(10,10)}位置指定
+Dialogue: 0,0:00:13.00,0:00:15.00,Default,,0,0,0,,{TL note: braces}本文{\i1}、続き

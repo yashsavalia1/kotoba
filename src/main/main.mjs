@@ -11,10 +11,17 @@ import { buildMenu } from './menu.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEV_URL = process.env.KOTOBA_RENDERER_URL;
+// Automated test launches: invisible, click-through, no Dock icon, never steals focus.
+const BACKGROUND = process.env.KOTOBA_BACKGROUND === '1';
 
-// Separate userData per instance lets parallel dev/test instances coexist (the
-// single-instance lock lives in userData).
-if (process.env.KOTOBA_USER_DATA) app.setPath('userData', process.env.KOTOBA_USER_DATA);
+const APP_NAME = 'Kotoba';
+const ICON = path.join(ROOT, 'build', 'icon.png');
+
+// setName would otherwise move userData to "Kotoba"; pin it so dev and packaged
+// builds share one profile even on case-sensitive volumes. KOTOBA_USER_DATA gives
+// parallel dev/test instances their own profile (and single-instance lock).
+app.setName(APP_NAME);
+app.setPath('userData', process.env.KOTOBA_USER_DATA || path.join(app.getPath('appData'), 'kotoba'));
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'kotoba', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
@@ -55,6 +62,8 @@ function createWindow() {
     height: 800,
     minWidth: 720,
     minHeight: 480,
+    title: APP_NAME,
+    icon: ICON,
     backgroundColor: '#0c0d10',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     show: false,
@@ -64,9 +73,15 @@ function createWindow() {
       sandbox: true,
       nodeIntegration: false,
       spellcheck: false,
+      backgroundThrottling: !BACKGROUND,
     },
   });
-  mainWindow.once('ready-to-show', () => mainWindow.show());
+  mainWindow.once('ready-to-show', () => {
+    if (!BACKGROUND) return mainWindow.show();
+    mainWindow.setOpacity(0);
+    mainWindow.setIgnoreMouseEvents(true);
+    mainWindow.showInactive();
+  });
   mainWindow.on('closed', () => (mainWindow = null));
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -100,11 +115,16 @@ if (!app.requestSingleInstanceLock()) {
     mainWindow?.focus();
   });
 
+  if (BACKGROUND) app.dock?.hide();
   app.whenReady().then(() => {
+    // Packaged builds take name and icon from the bundle; dev runs inside Electron.app.
+    if (!app.isPackaged && !BACKGROUND && fs.existsSync(ICON)) app.dock?.setIcon(ICON);
+    app.setAboutPanelOptions({ applicationName: APP_NAME, applicationVersion: app.getVersion() });
     configurePaths({
       userDataDir: app.getPath('userData'),
       dictDbPath: resolveDictDb(),
       tempDir: path.join(app.getPath('temp'), 'kotoba'),
+      dictReadOnly: app.isPackaged,
     });
     const legacy = path.join(ROOT, 'data', 'kotoba.db');
     if (!app.isPackaged && fs.existsSync(legacy)) {

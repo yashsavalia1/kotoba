@@ -4,7 +4,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import os from 'node:os';
+import http from 'node:http';
 import { userDb, dictReady } from '../src/core/db.mjs';
+import { configurePaths } from '../src/core/paths.mjs';
+import { setApiKey } from '../src/core/settings.mjs';
+import { joinCue } from '../src/core/cards.mjs';
+import { parseSubtitles } from '../src/core/subs.mjs';
 import { SAMPLE } from './helpers.mjs';
 import { recordCues, collocations, continuations } from '../src/core/corpus.mjs';
 import { buildCards } from '../src/core/cards.mjs';
@@ -13,6 +19,11 @@ import { ffmpegAvailable } from '../src/core/ffmpeg.mjs';
 
 const skip = dictReady() ? false : 'dictionary not built - run `npm run dict`';
 const FIXTURE = 999001;
+
+// A private temp dir, so leak checks are not confused by other processes' clips.
+const TEMP = fs.mkdtempSync(path.join(os.tmpdir(), 'kotoba-clips-'));
+configurePaths({ tempDir: TEMP });
+const tempFiles = () => fs.readdirSync(TEMP);
 
 const CUES = [
   '正直に言うと、よく分からない。',
@@ -192,4 +203,150 @@ test('escapes HTML so a subtitle cannot inject markup into a card', { skip }, as
   const html = JSON.stringify(cards[0].fields);
   assert.ok(!html.includes('<script>'), 'raw script tag reached a card field');
   assert.ok(html.includes('Fixture E01'));
+});
+
+test('a multi-line cue joins without a stray space in Japanese, and the token offset follows', () => {
+  assert.deepEqual(joinCue('正直、今日は\n行きたくない。', 7), { sentence: '正直、今日は行きたくない。', offset: 6 });
+  assert.deepEqual(joinCue('Honestly,\nno.', null), { sentence: 'Honestly, no.', offset: null });
+  assert.deepEqual(joinCue('（高木）ねえ\n（西片）うっ', 0).sentence, '（高木）ねえ（西片）うっ');
+});
+
+test('corpus ignores signs, songs and non-Japanese tracks, and re-loading replaces', { skip }, () => {
+  const MEDIA = 999002;
+  const ja = parseSubtitles(`[Script Info]
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,勝負だ、西片。
+Dialogue: 0,0:00:01.00,0:00:02.00,Signs,,0,0,0,,{\\pos(1,1)}勝負看板
+Dialogue: 0,0:00:03.00,0:00:04.00,OP,,0,0,0,,勝負の歌
+`, '.ass');
+  const count = () => userDb().prepare('SELECT count(*) AS n FROM line WHERE media_id = ?').get(MEDIA).n;
+  try {
+    assert.equal(recordCues(MEDIA, ja), 1);
+    assert.equal(count(), 1);
+    // The English reference track is recorded too by the caller; it must not wipe the Japanese.
+    assert.equal(recordCues(MEDIA, [{ start: 1, end: 2, text: "It's a match, Nishikata." }]), 0);
+    assert.equal(count(), 1);
+    // A shorter re-load leaves no stale lines behind.
+    recordCues(MEDIA, [...ja, ...ja.map((c) => ({ ...c, start: c.start + 10, end: c.end + 10 }))]);
+    assert.equal(count(), 2);
+    recordCues(MEDIA, ja);
+    assert.equal(count(), 1);
+  } finally {
+    userDb().prepare('DELETE FROM line WHERE media_id = ?').run(MEDIA);
+  }
+});
+
+test('collocations cut at word boundaries and skip dictionary words that merely contain it', { skip }, () => {
+  const MEDIA = 999003;
+  recordCues(MEDIA, ['高木さんの勝ち。', '高木さんの番だ。', '高木さんに負けた。', '高木さんに言う。', '本当かな'].map(
+    (text, i) => ({ start: i, end: i + 1, text })
+  ));
+  try {
+    const phrases = collocations('高木', 8).map((c) => c.phrase);
+    assert.ok(phrases.includes('高木さんの') && phrases.includes('高木さんに'), phrases.join(' '));
+    assert.ok(!phrases.includes('高木さ'), 'never a fragment');
+    assert.ok(!collocations('本当', 10).some((c) => c.phrase === '日本当帰'), '日本当帰 is not built on 本当');
+  } finally {
+    userDb().prepare('DELETE FROM line WHERE media_id = ?').run(MEDIA);
+  }
+});
+
+const llmServer = (status, body) =>
+  new Promise((resolve) => {
+    const server = http.createServer((req, res) => {
+      req.resume();
+      req.on('end', () => {
+        res.writeHead(status, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(body));
+      });
+    });
+    server.listen(0, '127.0.0.1', () => resolve(server));
+  });
+
+test('a failing Claude call skips only the generative types, with the reason', { skip }, async () => {
+  const server = await llmServer(401, { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } });
+  process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${server.address().port}`;
+  setApiKey('sk-ant-cards-test');
+  try {
+    const { cards, skipped } = await buildCards({ ...base, types: ['Contrast', 'Situation', 'Collocation'] });
+    assert.deepEqual(cards.map((c) => c.type), ['Collocation']);
+    assert.deepEqual(skipped.map((s) => s.type), ['Contrast', 'Situation']);
+    assert.match(skipped[0].reason, /API key/);
+  } finally {
+    setApiKey(null);
+    delete process.env.ANTHROPIC_BASE_URL;
+    server.close();
+  }
+});
+
+test('the hovered occurrence is the one highlighted and blanked', { skip: mediaSkip }, async () => {
+  const twice = { start: 0, end: 3, text: '正直、正直に言うと…' };
+  const { cards, files } = await buildCards({
+    ...base, mediaPath: sample, cue: twice, tokenStart: 3, types: ['Audio', 'ReverseContext'], translation: 'x',
+  });
+  const byType = Object.fromEntries(cards.map((c) => [c.type, c.fields]));
+  assert.equal(byType.Audio.Sentence, '正直、<b class="target">正直</b>に言うと…');
+  assert.equal(byType.ReverseContext.Cloze, '正直、＿＿＿に言うと…');
+  for (const f of files) fs.rmSync(f, { force: true });
+});
+
+test('a word that is not in the line never yields an empty cloze', { skip: mediaSkip }, async () => {
+  const { cards, skipped, files } = await buildCards({
+    ...base, mediaPath: sample, word: '正直', cue: { start: 0, end: 3, text: 'よく分からない。' },
+    types: ['ContextCloze', 'ReverseContext'], translation: 'x',
+  });
+  assert.deepEqual(cards.map((c) => c.type), ['ContextCloze']);
+  assert.equal(cards[0].fields.Sentence, 'よく分からない。');
+  assert.match(skipped[0].reason, /does not appear/);
+  for (const f of files) fs.rmSync(f, { force: true });
+});
+
+test('a word written in kana in the line is still found by its reading', { skip: mediaSkip }, async () => {
+  const { cards, files } = await buildCards({
+    ...base, mediaPath: sample, word: '正直',
+    cue: { start: 0, end: 3, text: 'しょうじき言って無理。' }, types: ['ReverseContext'], translation: 'x',
+  });
+  assert.equal(cards[0].fields.Cloze, '＿＿＿言って無理。');
+  for (const f of files) fs.rmSync(f, { force: true });
+});
+
+test('media names are content-addressed and the audio track choice is honoured', { skip: mediaSkip }, async () => {
+  const build = (over = {}) =>
+    buildCards({ ...base, mediaPath: sample, types: ['ContextCloze'], translation: 'x', ...over });
+  const a = await build();
+  const b = await build();
+  const c = await build({ cue: { ...cue, start: 1, end: 3 } });
+  const d = await build({ audioStream: 1 });
+  const names = (r) => r.cards[0].media.map((m) => m.filename).sort();
+  assert.deepEqual(names(a), names(b), 're-mining the same line reuses the same media');
+  assert.notDeepEqual(names(a), names(c), 'a different span is a different clip');
+  assert.notDeepEqual(names(a).find((n) => n.endsWith('.mp3')), names(d).find((n) => n.endsWith('.mp3')));
+  assert.ok(names(a).every((n) => /^kotoba_[0-9a-f]{16}\.(mp3|jpg)$/.test(n)), names(a).join());
+  for (const r of [a, b, c, d]) for (const f of r.files) fs.rmSync(f, { force: true });
+
+  await assert.rejects(build({ audioStream: 99 }), /Could not extract the audio clip with ffmpeg/);
+});
+
+test('ffmpeg failure is a clear error and leaves no temp files behind', { skip: mediaSkip }, async () => {
+  const before = tempFiles();
+  await assert.rejects(
+    buildCards({ ...base, mediaPath: '/nonexistent/missing.mkv', types: ['Audio'], translation: 'x' }),
+    /Could not extract the audio clip with ffmpeg: .*No such file/
+  );
+  // Screenshot succeeds, audio fails: the screenshot must not be orphaned.
+  await assert.rejects(
+    buildCards({ ...base, mediaPath: sample, audioStream: 99, types: ['ContextCloze', 'Image'], translation: 'x' }),
+    /audio clip/
+  );
+  assert.deepEqual(tempFiles(), before);
+});
+
+test('a reference-track translation is used as-is and keeps its line breaks', { skip: mediaSkip }, async () => {
+  const { cards, files } = await buildCards({
+    ...base, mediaPath: sample, types: ['Production'], translation: 'Honestly,\n<i>no idea</i>.',
+  });
+  assert.equal(cards[0].fields.Translation, 'Honestly,<br>&lt;i&gt;no idea&lt;/i&gt;.');
+  for (const f of files) fs.rmSync(f, { force: true });
 });

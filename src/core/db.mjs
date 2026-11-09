@@ -82,7 +82,9 @@ let user = null;
 
 /** Read-mostly JMdict database. Built by `npm run dict`; shipped read-only in the packaged app. */
 export function dictDb() {
-  if (!dict) {
+  if (!dict && paths.dictReadOnly) {
+    dict = new DatabaseSync(paths.dictDbPath, { readOnly: true });
+  } else if (!dict) {
     fs.mkdirSync(path.dirname(paths.dictDbPath), { recursive: true });
     dict = new DatabaseSync(paths.dictDbPath);
     dict.exec(DICT_SCHEMA);

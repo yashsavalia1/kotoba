@@ -23,7 +23,7 @@ const [w, h] = opt('size', '1440x900').split('x').map(Number);
 const app = await electron.launch({
   args: [ROOT, ...all('open').map((p) => path.resolve(p))],
   cwd: ROOT,
-  env: { ...process.env, KOTOBA_USER_DATA: userData },
+  env: { KOTOBA_BACKGROUND: '1', ...process.env, KOTOBA_USER_DATA: userData },
 });
 const errors = [];
 const win = await app.firstWindow();

@@ -9,6 +9,7 @@ const state = {
   userDataDir: process.env.KOTOBA_USER_DATA || path.join(ROOT, 'data', 'dev-user'),
   dictDbPath: process.env.KOTOBA_DICT_DB || path.join(ROOT, 'data', 'dict.db'),
   tempDir: path.join(os.tmpdir(), 'kotoba'),
+  dictReadOnly: false,
 };
 
 // Core modules never import Electron; main (or a test) calls this before touching a database.
@@ -23,6 +24,9 @@ export const paths = {
   },
   get dictDbPath() {
     return state.dictDbPath;
+  },
+  get dictReadOnly() {
+    return state.dictReadOnly;
   },
   get tempDir() {
     fs.mkdirSync(state.tempDir, { recursive: true });

@@ -1,0 +1,22 @@
+WEBVTT - with a header
+
+STYLE
+::cue { color: yellow }
+
+REGION
+id:top
+width:40%
+
+NOTE this block is a comment
+and spans --  lines
+
+intro
+00:01.000 --> 00:03.500 align:start line:0
+<v 高木>からかい上手の</v> &amp; <c.yellow>高木さん</c>
+
+00:00:04.000 --> 00:00:05.000
+<00:00:04.200>カラ<00:00:04.500>オケ
+
+5
+01:00:00.250 --> 01:00:01.000 position:10%
+一時間後
