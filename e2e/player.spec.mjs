@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { test, expect, invoke, testId, sampleRecord, sampleSubs, video, SAMPLE } from './fixtures.mjs';
 
 test('home renders on a bare launch', async ({ launch }) => {
@@ -9,10 +12,10 @@ test('opens the sample from argv and plays it', async ({ launch }) => {
   const { page } = await launch({ files: [SAMPLE] });
   const rec = await sampleRecord(page);
   const plan = await invoke(page, 'playback:plan', rec.id);
-  expect(plan.url).toMatch(/^kotoba:\/\/media\//);
+  expect(plan).toMatchObject({ mode: 'stream', reason: 'ac3 audio' });
 
   const v = await video(page);
-  await expect.poll(() => v.evaluate((el) => el.currentSrc)).toMatch(/^kotoba:\/\/media\//);
+  await expect.poll(() => v.evaluate((el) => el.dataset.mode)).toBe('stream');
   await v.evaluate((el) => el.paused && el.play());
   const t0 = await v.evaluate((el) => el.currentTime);
   await expect.poll(() => v.evaluate((el) => el.currentTime), { timeout: 10_000 }).toBeGreaterThan(t0 + 0.5);
@@ -55,4 +58,42 @@ test('transcript and playlist drawers, settings dialog', async ({ launch }) => {
   await expect(await testId(page, 'playlist')).toBeVisible();
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('evt:command', 'open-settings'));
   await expect(await testId(page, 'settings')).toBeVisible();
+});
+
+test('> opens the next file in the folder and keeps a player on screen', async ({ launch, userDataDir }) => {
+  const dir = fs.mkdtempSync(path.join(userDataDir, 'folder-'));
+  for (const n of ['a', 'b']) fs.copyFileSync(SAMPLE, path.join(dir, `${n}.mkv`));
+  const { page } = await launch({ files: [path.join(dir, 'a.mkv')] });
+  let v = await video(page);
+  await expect.poll(() => v.evaluate((el) => el.readyState)).toBeGreaterThanOrEqual(2);
+  await page.keyboard.press('Shift+Period');
+  await expect.poll(() => page.title()).toContain('b');
+  v = await video(page);
+  await expect.poll(() => v.evaluate((el) => el.readyState)).toBeGreaterThanOrEqual(2);
+});
+
+const ffmpegChildren = (pid) => {
+  try {
+    return execFileSync('pgrep', ['-P', String(pid), '-x', 'ffmpeg']).toString().trim().split('\n').length;
+  } catch {
+    return 0;
+  }
+};
+
+test('stream mode seeks land in media time and cancelling a stream kills its ffmpeg', async ({ launch }) => {
+  const { app, page } = await launch({ files: [SAMPLE] });
+  const rec = await sampleRecord(page);
+  const v = await video(page);
+  await expect.poll(() => v.evaluate((el) => el.dataset.mode)).toBe('stream');
+  for (const t of [25, 5, 15]) {
+    await v.evaluate((el, t) => (el.currentTime = t), t);
+    await expect.poll(() => v.evaluate((el) => !el.seeking && el.readyState >= 3)).toBe(true);
+    expect(Math.abs((await v.evaluate((el) => el.currentTime)) - t)).toBeLessThan(0.5);
+  }
+  await page.evaluate(async (id) => {
+    const reader = (await fetch(`kotoba://stream/${id}?start=5`)).body.getReader();
+    await reader.read();
+    await reader.cancel();
+  }, rec.id);
+  await expect.poll(() => ffmpegChildren(app.process().pid)).toBe(0);
 });

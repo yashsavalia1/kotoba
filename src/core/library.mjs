@@ -294,7 +294,7 @@ const SDH = new Set(['sdh', 'cc', 'hoh']);
 const langDisplay = new Intl.DisplayNames(['en'], { type: 'language' });
 
 // `ja-JP`, `en_US`, `zh-Hans` → their primary subtag.
-const langOfTag = (t) => LANG_OF.get(t.toLowerCase().replace(/^([a-z]{2,3})[-_][a-z]{2,4}$/, '$1')) ?? null;
+export const langOfTag = (t) => LANG_OF.get(t.toLowerCase().replace(/^([a-z]{2,3})[-_][a-z]{2,4}$/, '$1')) ?? null;
 const isTag = (t) => langOfTag(t) != null || FORCED.has(t.toLowerCase()) || SDH.has(t.toLowerCase());
 
 /** Stem without extension or trailing `.ja.forced`-style tags. */

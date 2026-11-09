@@ -1,10 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
-import { protocol } from 'electron';
+import { app, protocol } from 'electron';
 import { ROOT } from '../core/paths.mjs';
 import { pathOf } from '../core/library.mjs';
-import { playbackPlan } from '../core/playback.mjs';
+import { playbackPlan, streamArgs, TS_OFFSET } from '../core/playback.mjs';
+import { ffmpegPath } from '../core/ffmpeg.mjs';
 import { handle } from './ipc-util.mjs';
 
 const RENDERER_DIR = path.resolve(process.env.KOTOBA_RENDERER_DIR || path.join(ROOT, 'out', 'renderer'));
@@ -71,7 +73,54 @@ function serveMedia(url, request) {
   return serveFile(abs, request);
 }
 
+const streams = new Set();
+
+/** kotoba://stream/<id>?start=<sec>&audio=<stream index>: ffmpeg fragmented MP4, killed when the reader cancels. */
+async function serveStream(url) {
+  const id = Number(url.pathname.replace(/^\//, ''));
+  const start = Number(url.searchParams.get('start') ?? 0);
+  const audio = url.searchParams.get('audio');
+  if (!Number.isInteger(id) || !(start >= 0) || (audio && !/^\d+$/.test(audio))) return new Response('bad request', { status: 400 });
+  let args;
+  try {
+    args = await streamArgs(id, { start, audio: audio ? Number(audio) : null });
+  } catch {
+    return new Response('unknown media', { status: 404 });
+  }
+  const proc = spawn(ffmpegPath(), args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  streams.add(proc);
+  let stderr = '';
+  proc.stderr.on('data', (d) => (stderr = (stderr + d).slice(-4000)));
+  proc.on('close', (code, signal) => {
+    streams.delete(proc);
+    if (code && !signal) console.error(`ffmpeg stream ${id}@${start} exited ${code}: ${stderr.trim()}`);
+  });
+  const body = Readable.toWeb(proc.stdout);
+  const kill = () => proc.exitCode === null && proc.kill('SIGKILL');
+  const reader = body.getReader();
+  return new Response(
+    new ReadableStream({
+      pull: async (c) => {
+        const { value, done } = await reader.read();
+        if (done) c.close();
+        else c.enqueue(value);
+      },
+      cancel: kill,
+    }),
+    {
+      headers: {
+        'content-type': 'video/mp4',
+        'access-control-allow-origin': '*',
+        'access-control-expose-headers': 'x-ts-offset',
+        'cache-control': 'no-store',
+        'x-ts-offset': String(TS_OFFSET),
+      },
+    }
+  );
+}
+
 export function registerProtocol() {
+  app.on('will-quit', () => streams.forEach((p) => p.kill('SIGKILL')));
   protocol.handle('kotoba', (request) => {
     const url = new URL(request.url);
     switch (url.host) {
@@ -79,6 +128,8 @@ export function registerProtocol() {
         return serveApp(url);
       case 'media':
         return serveMedia(url, request);
+      case 'stream':
+        return serveStream(url);
       default:
         return new Response('not found', { status: 404 });
     }

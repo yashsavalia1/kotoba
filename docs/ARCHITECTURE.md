@@ -12,7 +12,7 @@ src/
     ffmpeg.mjs       resolve ffmpeg/ffprobe (setting → env → bundled → PATH), encoder caps
     media.mjs        probe, clip extraction, subtitle-file decoding, display titles
     library.mjs      opened-media records, siblings playlist, subtitle discovery/loading
-    playback.mjs     playbackPlan(id): how the renderer should play a file
+    playback.mjs     playbackPlan(id): direct vs stream from a measured format table; streamArgs() for ffmpeg
     subs.mjs         SRT/VTT/ASS parsing → [{ start, end, text }]
     deinflect.mjs    Japanese deinflection rules
     dict.mjs         lookup, segmentation (JMdict words + JMnedict names), homophones, shared-kanji
@@ -26,18 +26,20 @@ src/
     ipc-util.mjs     handle(channel, fn): trusted-sender check + { ok, value | error } envelope
     ipc-core.mjs     app/settings/dict/cards/anki channels
     files.mjs        library/subs/dialog channels, openPaths(), argv handling
-    protocol.mjs     kotoba:// scheme: app (renderer), media (byte ranges), playback channels
+    protocol.mjs     kotoba:// scheme: app (renderer), media (byte ranges), stream (ffmpeg fMP4), playback channels
     menu.mjs         native menu; playback commands are sent to the renderer as evt:command
   preload/preload.cjs   window.kotoba = { invoke, on, pathForFile, platform }
   renderer/      React, built by Vite into out/renderer (or $KOTOBA_RENDERER_DIR)
     src/api/*.js     one module per domain; the only place that names IPC channels
-    src/player/      VideoSurface: the <video> element fed by playback:plan
+    src/player/      VideoSurface (direct src or MSE) and mse.js, the kotoba://stream client
     src/ui/          App shell, Home (library), Player, Subtitles, CardMaker, Settings, Shortcuts
 ```
 
 Segmentation quality: `node scripts/eval-segmentation.mjs --dump x.txt` over a subtitle
 folder; diff two dumps to see what a dict.mjs/deinflect.mjs change moved.
 Playback coverage: `node scripts/make-fixtures.mjs` then `node scripts/verify-playback.mjs`.
+Its tone detector misses audio on a different file most runs (also in `--matrix`, with no app
+code involved): rerun a "no audio heard" file before believing it.
 
 ## Process boundary
 
@@ -59,6 +61,21 @@ Playback coverage: `node scripts/make-fixtures.mjs` then `node scripts/verify-pl
 | temp | `$TMPDIR/kotoba` | clip files for one card build; deleted after AnkiConnect copies them |
 
 There is no media cache. Playback is direct or streamed; nothing is written to disk.
+
+## Playback
+
+- **direct**: `kotoba://media/<id>` byte ranges; Chromium demuxes and decodes. Only for the
+  container × codec × pixel-format table in playback.mjs, measured with
+  `scripts/verify-playback.mjs --matrix`, and only for the file's first audio track (Chromium
+  ignores the default flag; switching `audioTracks` proved unreliable).
+- **stream**: `kotoba://stream/<id>?start=<sec>&audio=<stream index>` pipes ffmpeg → fragmented
+  MP4. Video is copied when Chromium decodes it, else h264_videotoolbox (libx264 fallback);
+  audio is copied if aac/opus stereo, else stereo AAC. `-copyts -start_at_zero` with
+  `+frag_discont`, `-avoid_negative_ts disabled` and `-use_editlist 0` make every fragment carry
+  media time, so a restart just appends. Copy mode starts 12 s early (keyframes, late TS seeks).
+  The renderer's MSE client (player/mse.js) restarts the stream on seeks outside the range being
+  filled and stops reading 60 s ahead, which blocks ffmpeg on its pipe. Cancelling the response
+  kills ffmpeg.
 
 ## Environment variables (dev / test)
 
@@ -86,7 +103,7 @@ Playwright, runs JS in the renderer and screenshots it.
 | files:classify(paths) | files | [{ path, kind: media·subtitle·folder·other }] |
 | subs:tracks(id) / subs:load(id, key) / subs:attach(id, file) | files | tracks · { key, cues, tokens } |
 | dialog:openMedia / openFolder / attachSubtitle(id) | files | — |
-| playback:plan(id) | protocol | { mode, url, duration, video, audio[], chapters[] } |
+| playback:plan(id) | protocol | { mode, reason, url, streamUrl, duration, video, audioStream, audio[{…, directPlayable, reason}], chapters[] } |
 
 Events main → renderer: `evt:open-media { id, ids }`, `evt:command <name>`.
 

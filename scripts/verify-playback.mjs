@@ -245,8 +245,8 @@ if (flag('matrix')) {
         const plan = await window.kotoba.invoke('playback:plan', id);
         let v;
         for (let i = 0; i < 300; i++) {
-          v = document.querySelector('.videowrap video');
-          if (v && v.dataset.mediaId === String(id) && v.readyState >= 2) break;
+          v = document.querySelector('[data-testid=player] video');
+          if (v && new RegExp(`/${id}(\\?|$)`).test(v.dataset.source) && v.readyState >= 2) break;
           await new Promise((res) => setTimeout(res, 50));
         }
         const out = { mode: v?.dataset.mode, reason: plan.reason, firstFrameMs: Math.round(performance.now() - t0) };
