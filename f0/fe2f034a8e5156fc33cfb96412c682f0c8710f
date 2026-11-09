@@ -1,0 +1,94 @@
+src/core/dict.mjs
+  s_a6cff45053013b::t_869c6b40fae930 71,223,227-228,230,232-233,238-240,247-248,259-266,268,271-273,281-287,290
+  s_87fef2d75ac43e::t_435a3accafe75e 250-253,255-258
+  s_a6cff45053013b::t_64de49c513df81 192,220-222,267,322,330
+  s_87fef2d75ac43e::t_68e5d99d5e3d9d 254
+  s_87fef2d75ac43e::t_5d3d0d4ba73bd4 249
+  s_87fef2d75ac43e::t_fe8084c639789f 291
+  s_a6cff45053013b::t_7ff65ea51c78e4 13-18,20-26,44-70,72-74,77-191,193-198,200-219,277-278,289,292-296,298-321,323-324,327-329,336,345-346,348-349,353-357,359-362
+  s_a6cff45053013b::t_c80e629e0c87aa 75-76,224-226,229,231,234-237,241-243,246
+src/renderer/src/ui/util.test.mjs
+  s_a6cff45053013b::t_60574d81f0d686 1-17
+src/renderer/src/ui/Subtitles.jsx
+  s_a6cff45053013b::t_02271fcff887d0 1-105
+src/renderer/src/ui/Player.jsx
+  s_a6cff45053013b::t_e86ff90596c73b 402-403,597-598,794
+  s_a6cff45053013b::t_4735fbad1b7fe1 1-111,114-159,161-182,185-199,201-203,205-214,216-219,222-280,292-293,295-296,299,304-309,311-314,321,323-326,329-336,343-345,348-357,362-363,369,371-372,375-380,382,386-401,404,406-487,490-503,505,508,510-511,522,525-596,599-645,648-687,690-696,698-735,738-759,761-793,795-813,815,817-832
+  s_a6cff45053013b::t_b2daf4312ef4c4 183,281-291
+  s_a6cff45053013b::t_d49f0e1cee6ee8 760
+src/renderer/src/ui/Shortcuts.jsx
+  s_a6cff45053013b::t_2122c4fa34d37a 1-78
+src/renderer/src/ui/icons.jsx
+  s_a6cff45053013b::t_4a5d85b38ae8c0 1-40
+src/renderer/src/ui/CardMaker.jsx
+  s_a6cff45053013b::t_2f7d8fd6288e54 125
+  s_a6cff45053013b::t_bc494180d1e460 1-3,5-40,43-84,86-93,95-124,126-238
+  s_a6cff45053013b::t_b2daf4312ef4c4 41,94
+  s_a6cff45053013b::t_09e19406c896b5 4,42,85
+src/renderer/src/ui/Settings.jsx
+  s_a6cff45053013b::t_64de49c513df81 124,128
+  s_a6cff45053013b::t_09e19406c896b5 1-123,125-127,129-160
+src/renderer/src/ui/util.js
+  s_a6cff45053013b::t_60574d81f0d686 1-93
+scripts/eval-segmentation.mjs
+  s_a6cff45053013b::t_327f08f86e9209 1-111
+src/renderer/src/main.jsx
+  s_a6cff45053013b::t_b2daf4312ef4c4 3-4
+docs/ARCHITECTURE.md
+  s_87fef2d75ac43e::t_bd6f0db7452705 34-35,38-40
+  s_87fef2d75ac43e::t_a8f78d4e792e77 18
+  s_87fef2d75ac43e::t_8d135e1f2278ee 41
+scripts/build-dict.mjs
+  s_a6cff45053013b::t_6dea88a580e370 1-6,8-10,16-17,20-42,44-45,47-59,62-89,91-93,95-122,124-137,139-166,169-197
+src/renderer/src/ui/theme.css
+  s_a6cff45053013b::t_64f4db30bf6083 357
+  s_a6cff45053013b::t_978aac60adb839 1-215,217-284,286-356
+  s_a6cff45053013b::t_41d71d057c35ae 216,285
+src/renderer/src/player/VideoSurface.jsx
+  s_a6cff45053013b::t_a29fb4cab01736 1-46
+src/main/menu.mjs
+  s_a6cff45053013b::t_6fff3b4c3b14d7 26-27,29-33
+  s_a6cff45053013b::t_8812280eefde45 1,3-4,8-25,35,37-54,60,62,64-65,72-76,80-112,119-120,122,127-130
+src/renderer/src/ui/Home.jsx
+  s_a6cff45053013b::t_0aa1ab43ba208d 1-157
+src/core/deinflect.mjs
+  s_a6cff45053013b::t_9d34488ba27b92 166-170,172
+  s_a6cff45053013b::t_7c4a04454e1cdd 10-13,79,92,137-144,151,155-160,193,232-237
+scripts/verify-playback.mjs
+  s_a6cff45053013b::t_633df29154ce7f 137,140
+  s_a6cff45053013b::t_80063ee80af88d 127,156-157
+  s_a6cff45053013b::t_29b1534c24cf17 1-39,46-126,129-135,138-139,141-155,158-303
+  s_a6cff45053013b::t_037577af20e3fa 40-42,44-45
+  s_a6cff45053013b::t_cb378144d80f9f 43
+  s_a6cff45053013b::t_c3309981affd5c 128,136
+src/renderer/src/ui/App.jsx
+  s_a6cff45053013b::t_b2daf4312ef4c4 75,227
+  s_a6cff45053013b::t_64f4db30bf6083 1-5,8-11,13-14,18-19,21,23-29,31-34,37-42,45-62,67-74,76-77,79,82,85-88,90-92,95-125,128-137,141-142,144-161,164-165,169-170,174,176,181-183,185,188-189,191,194-221,223-226,228-237,239-244,247-257
+scripts/make-fixtures.mjs
+  s_a6cff45053013b::t_5282257ce502bd 1-95,97-116
+  s_a6cff45053013b::t_a1d278a6439e6e 96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f0fe2f034a8e5156fc33cfb96412c682f0c8710f",
+  "prompts": {},
+  "sessions": {
+    "s_87fef2d75ac43e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29db1b8e-af83-4b10-908b-372aabf84dfe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Yash Savalia <yashsavalia1@gmail.com>"
+    },
+    "s_a6cff45053013b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1e4dd0a5-6674-45f1-9e6c-f161b363671d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Yash Savalia <yashsavalia1@gmail.com>"
+    }
+  }
+}
