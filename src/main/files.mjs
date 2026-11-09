@@ -4,53 +4,91 @@ import { app, dialog, shell } from 'electron';
 import * as library from '../core/library.mjs';
 import { tokenize } from '../core/dict.mjs';
 import { recordCues } from '../core/corpus.mjs';
+import { getSettings } from '../core/settings.mjs';
 import { isMediaFile } from '../core/media.mjs';
 import { SUB_EXTS } from '../core/subs.mjs';
 import { handle } from './ipc-util.mjs';
 
-const isSub = (p) => SUB_EXTS.includes(path.extname(p).toLowerCase());
+const MAX_PATHS = 1000;
 
-function expand(paths) {
-  const out = [];
-  for (const p of paths) {
-    let st;
-    try {
-      st = fs.statSync(p);
-    } catch {
-      continue;
-    }
-    if (st.isDirectory()) {
-      for (const n of fs.readdirSync(p).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))) {
-        if (!n.startsWith('.') && isMediaFile(n)) out.push(path.join(p, n));
-      }
-    } else if (isMediaFile(p)) {
-      out.push(p);
-    }
+function statSafe(p) {
+  try {
+    return fs.statSync(p);
+  } catch {
+    return null;
   }
-  return out;
 }
 
-/** Entry point for every way a file arrives: Finder, dock, argv, menu, dialog, drag-drop. */
+const cleanPaths = (paths) =>
+  [...new Set((Array.isArray(paths) ? paths : []).filter((p) => typeof p === 'string' && p).slice(0, MAX_PATHS).map((p) => path.resolve(p)))];
+
+const SKIP_DIRS = /^(subs?|subtitles?|extras?|featurettes?|samples?|bonus)$/i;
+
+/** First media file of a folder in natural order, descending into subfolders (Season 1/) when it has none. */
+function firstMediaIn(dir, budget = { dirs: 200 }, depth = 0) {
+  if (--budget.dirs < 0) return null;
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => !e.name.startsWith('.'));
+  } catch {
+    return null;
+  }
+  entries.sort((a, b) => library.naturalCompare(a.name, b.name));
+  const file = entries.find((e) => isMediaFile(e.name) && statSafe(path.join(dir, e.name))?.isFile());
+  if (file) return path.join(dir, file.name);
+  if (depth >= 2) return null;
+  for (const e of entries) {
+    if (!e.isDirectory() || SKIP_DIRS.test(e.name)) continue;
+    const found = firstMediaIn(path.join(dir, e.name), budget, depth + 1);
+    if (found) return found;
+  }
+  return null;
+}
+
+/**
+ * Entry point for every way a file arrives: Finder, dock, argv, menu, dialog, drag-drop.
+ * A folder opens its first item; the rest of it is reachable via siblings/adjacent.
+ * Subtitle files arriving with media are attached to the first opened file.
+ */
 export function openPaths(ctx, paths) {
   const records = [];
-  for (const p of expand(paths)) {
+  const subs = [];
+  for (const p of cleanPaths(paths)) {
+    const st = statSafe(p);
+    if (!st) continue;
+    if (st.isFile() && library.isSubtitleFile(p)) {
+      subs.push(p);
+      continue;
+    }
+    const file = st.isDirectory() ? firstMediaIn(p) : p;
+    if (!file || !isMediaFile(file)) continue;
     try {
-      records.push(library.openMedia(p));
-      app.addRecentDocument(p);
+      const record = library.openMedia(file);
+      if (!records.some((r) => r.id === record.id)) records.push(record);
+      app.addRecentDocument(file);
     } catch (e) {
-      console.error('[kotoba] open failed:', p, e.message);
+      console.error('[kotoba] open failed:', file, e.message);
     }
   }
-  if (records.length) ctx.send('evt:open-media', { id: records[0].id, ids: records.map((r) => r.id) });
+  if (!records.length) return records;
+  for (const s of subs) {
+    try {
+      library.attachSubtitle(records[0].id, s);
+    } catch (e) {
+      console.error('[kotoba] attach failed:', s, e.message);
+    }
+  }
+  ctx.send('evt:open-media', { id: records[0].id, ids: records.map((r) => r.id) });
   return records;
 }
 
 export function argvFiles(argv, cwd = process.cwd()) {
+  const appPath = path.resolve(app.getAppPath());
   return argv
     .slice(app.isPackaged ? 1 : 2)
-    .filter((a) => !a.startsWith('-'))
+    .filter((a) => typeof a === 'string' && a && !a.startsWith('-'))
     .map((a) => path.resolve(cwd, a))
-    .filter((a) => fs.existsSync(a));
+    .filter((a) => a !== appPath && fs.existsSync(a));
 }
 
 export async function openMediaDialog(ctx, { folders = false } = {}) {
@@ -61,28 +99,62 @@ export async function openMediaDialog(ctx, { folders = false } = {}) {
   return res.canceled ? [] : openPaths(ctx, res.filePaths);
 }
 
+function classify(p) {
+  const st = typeof p === 'string' && p ? statSafe(p) : null;
+  if (!st) return 'other';
+  if (st.isDirectory()) return 'folder';
+  if (!st.isFile()) return 'other';
+  return library.isSubtitleFile(p) ? 'subtitle' : isMediaFile(p) ? 'media' : 'other';
+}
+
 export function registerLibraryIpc(ctx) {
   handle('library:list', () => library.listMedia());
   handle('library:get', (id) => library.getMedia(id));
-  handle('library:remove', (id) => library.removeMedia(id));
-  handle('library:open', (paths) => openPaths(ctx, paths ?? []));
+  handle('library:remove', (id) => void library.removeMedia(id));
+  handle('library:clearHistory', () => {
+    library.clearHistory();
+    app.clearRecentDocuments();
+  });
+  handle('library:open', (paths) => openPaths(ctx, paths));
   handle('library:siblings', (id) => library.siblings(id));
+  handle('library:adjacent', (id, delta) => {
+    const record = library.adjacent(id, delta);
+    if (record) app.addRecentDocument(record.path);
+    return record;
+  });
   handle('library:openSibling', (absPath) => {
-    const dirs = new Set(library.listMedia({ limit: 10000 }).map((m) => m.folder));
-    if (!dirs.has(path.dirname(path.resolve(absPath)))) throw new Error('not in a folder you have opened');
-    return library.openMedia(absPath);
+    if (typeof absPath !== 'string') throw new Error('path required');
+    if (!library.isKnownFolder(path.dirname(path.resolve(absPath)))) throw new Error('not in a folder you have opened');
+    const record = library.openMedia(absPath);
+    app.addRecentDocument(record.path);
+    return record;
+  });
+  handle('library:locate', (id, newPath) => {
+    if (typeof newPath !== 'string') throw new Error('path required');
+    const record = library.locateMedia(id, newPath);
+    app.addRecentDocument(record.path);
+    return record;
   });
   handle('library:setPosition', (id, position, duration) => library.setPosition(id, position, duration));
   handle('library:setPrefs', (id, patch) => library.setPrefs(id, patch));
-  handle('library:reveal', (id) => shell.showItemInFolder(library.pathOf(id)));
+  handle('library:reveal', (id) => {
+    const abs = library.pathOf(id);
+    if (fs.existsSync(abs)) shell.showItemInFolder(abs);
+    else if (fs.existsSync(path.dirname(abs))) shell.openPath(path.dirname(abs));
+  });
 
   handle('subs:tracks', (id) => library.subtitleTracks(id));
   handle('subs:load', async (id, key) => {
-    const cues = await library.loadSubtitleTrack(id, key);
-    if (cues.length) recordCues(Number(id), cues);
-    return { key, cues, tokens: cues.map((c) => tokenize(c.text)) };
+    const { track, cues } = await library.loadSubtitleTrack(id, key);
+    // Only target-language lines feed the corpus; a reference (English) track would pollute it.
+    const target = getSettings().targetLang;
+    if (cues.length && (track.language == null || track.language === target)) recordCues(Number(id), cues);
+    return { key, language: track.language, cues, tokens: cues.map((c) => tokenize(c.text)) };
   });
-  handle('subs:attach', (id, file) => library.attachSubtitle(id, file));
+  handle('subs:attach', (id, file) => {
+    if (typeof file !== 'string') throw new Error('path required');
+    return library.attachSubtitle(id, file);
+  });
 
   handle('dialog:openMedia', () => openMediaDialog(ctx));
   handle('dialog:openFolder', () => openMediaDialog(ctx, { folders: true }));
@@ -94,5 +166,18 @@ export function registerLibraryIpc(ctx) {
     });
     return res.canceled ? null : library.attachSubtitle(id, res.filePaths[0]);
   });
-  handle('files:classify', (paths) => (paths ?? []).map((p) => ({ path: p, kind: isSub(p) ? 'subtitle' : isMediaFile(p) ? 'media' : fs.existsSync(p) && fs.statSync(p).isDirectory() ? 'folder' : 'other' })));
+  handle('dialog:locateMedia', async (id) => {
+    const old = library.pathOf(id);
+    const dir = path.dirname(old);
+    const res = await dialog.showOpenDialog(ctx.getWindow(), {
+      title: `Locate ${path.basename(old)}`,
+      properties: ['openFile'],
+      ...(fs.existsSync(dir) ? { defaultPath: dir } : {}),
+    });
+    if (res.canceled) return null;
+    const record = library.locateMedia(id, res.filePaths[0]);
+    app.addRecentDocument(record.path);
+    return record;
+  });
+  handle('files:classify', (paths) => (Array.isArray(paths) ? paths.slice(0, MAX_PATHS) : []).map((p) => ({ path: p, kind: classify(p) })));
 }
