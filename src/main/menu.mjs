@@ -56,7 +56,6 @@ export function buildMenu(ctx) {
       label: 'File',
       submenu: [
         { label: 'Open File…', accelerator: 'CmdOrCtrl+O', click: () => openMediaDialog(ctx) },
-        { label: 'Open Folder…', accelerator: 'CmdOrCtrl+Shift+O', click: () => openMediaDialog(ctx, { folders: true }) },
         recentMenu(ctx),
         { type: 'separator' },
         { label: 'Add Subtitle File…', accelerator: 'CmdOrCtrl+Shift+S', click: cmd('attach-subtitle') },
@@ -98,7 +97,6 @@ export function buildMenu(ctx) {
           label: 'Subtitles',
           submenu: [
             { label: 'Show / Hide Subtitles', ...key('S'), click: cmd('toggle-subs') },
-            { label: 'Show / Hide Secondary Line', ...key('Shift+S'), click: cmd('toggle-secondary') },
             { label: 'Next Subtitle Track', ...key('V'), click: cmd('cycle-subs') },
             { type: 'separator' },
             { label: 'Delay −100 ms', ...key('G'), click: cmd('delay-down') },
@@ -109,7 +107,6 @@ export function buildMenu(ctx) {
             { label: 'Smaller Text', ...key('-'), click: cmd('font-down') },
           ],
         },
-        { label: 'Next Audio Track', ...key('B'), click: cmd('cycle-audio') },
       ],
     },
     {

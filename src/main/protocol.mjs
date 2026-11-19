@@ -1,12 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
-import { app, protocol } from 'electron';
+import { protocol } from 'electron';
 import { ROOT } from '../core/paths.mjs';
 import { pathOf } from '../core/library.mjs';
-import { playbackPlan, streamArgs, TS_OFFSET } from '../core/playback.mjs';
-import { ffmpegPath } from '../core/ffmpeg.mjs';
+import { playbackPlan } from '../core/playback.mjs';
+import { checkPath } from '../core/browse.mjs';
+import { thumbnail } from '../core/thumbs.mjs';
+import { isVideoFile } from '../core/media.mjs';
 import { handle } from './ipc-util.mjs';
 
 const RENDERER_DIR = path.resolve(process.env.KOTOBA_RENDERER_DIR || path.join(ROOT, 'out', 'renderer'));
@@ -15,14 +16,14 @@ const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.json': 'application/json',
   '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm',
-  '.mkv': 'video/x-matroska', '.mka': 'audio/x-matroska', '.ogv': 'video/ogg', '.ogg': 'audio/ogg',
+  '.mkv': 'video/x-matroska', '.mka': 'audio/x-matroska', '.ogg': 'audio/ogg', '.oga': 'audio/ogg',
   '.opus': 'audio/ogg', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.aac': 'audio/aac',
-  '.flac': 'audio/flac', '.wav': 'audio/wav', '.ts': 'video/mp2t', '.m2ts': 'video/mp2t',
+  '.flac': 'audio/flac', '.wav': 'audio/wav',
 };
 const mimeOf = (p) => MIME[path.extname(p).toLowerCase()] ?? 'application/octet-stream';
 
 const CSP =
-  "default-src 'self' kotoba:; media-src kotoba: blob:; img-src kotoba: data: blob:; " +
+  "default-src 'self' kotoba:; media-src kotoba:; img-src kotoba: data: blob:; " +
   "style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' kotoba:; font-src 'self' data:";
 
 function serveApp(url) {
@@ -73,54 +74,19 @@ function serveMedia(url, request) {
   return serveFile(abs, request);
 }
 
-const streams = new Set();
-
-/** kotoba://stream/<id>?start=<sec>&audio=<stream index>: ffmpeg fragmented MP4, killed when the reader cancels. */
-async function serveStream(url) {
-  const id = Number(url.pathname.replace(/^\//, ''));
-  const start = Number(url.searchParams.get('start') ?? 0);
-  const audio = url.searchParams.get('audio');
-  if (!Number.isInteger(id) || !(start >= 0) || (audio && !/^\d+$/.test(audio))) return new Response('bad request', { status: 400 });
-  let args;
+/** kotoba://thumb/?path=<abs>[&at=<sec>]: a library frame. Only for videos under the library root or already registered. */
+async function serveThumb(url) {
   try {
-    args = await streamArgs(id, { start, audio: audio ? Number(audio) : null });
+    const abs = checkPath(url.searchParams.get('path'));
+    const file = isVideoFile(abs) && (await thumbnail(abs, Number(url.searchParams.get('at')) || 0));
+    if (file) return new Response(fs.readFileSync(file), { headers: { 'content-type': 'image/jpeg' } });
   } catch {
-    return new Response('unknown media', { status: 404 });
+    /* outside the library, unreadable, or a frame removed under us */
   }
-  const proc = spawn(ffmpegPath(), args, { stdio: ['ignore', 'pipe', 'pipe'] });
-  streams.add(proc);
-  let stderr = '';
-  proc.stderr.on('data', (d) => (stderr = (stderr + d).slice(-4000)));
-  proc.on('close', (code, signal) => {
-    streams.delete(proc);
-    if (code && !signal) console.error(`ffmpeg stream ${id}@${start} exited ${code}: ${stderr.trim()}`);
-  });
-  const body = Readable.toWeb(proc.stdout);
-  const kill = () => proc.exitCode === null && proc.kill('SIGKILL');
-  const reader = body.getReader();
-  return new Response(
-    new ReadableStream({
-      pull: async (c) => {
-        const { value, done } = await reader.read();
-        if (done) c.close();
-        else c.enqueue(value);
-      },
-      cancel: kill,
-    }),
-    {
-      headers: {
-        'content-type': 'video/mp4',
-        'access-control-allow-origin': '*',
-        'access-control-expose-headers': 'x-ts-offset',
-        'cache-control': 'no-store',
-        'x-ts-offset': String(TS_OFFSET),
-      },
-    }
-  );
+  return new Response('no thumbnail', { status: 404 });
 }
 
 export function registerProtocol() {
-  app.on('will-quit', () => streams.forEach((p) => p.kill('SIGKILL')));
   protocol.handle('kotoba', (request) => {
     const url = new URL(request.url);
     switch (url.host) {
@@ -128,8 +94,8 @@ export function registerProtocol() {
         return serveApp(url);
       case 'media':
         return serveMedia(url, request);
-      case 'stream':
-        return serveStream(url);
+      case 'thumb':
+        return serveThumb(url);
       default:
         return new Response('not found', { status: 404 });
     }

@@ -7,7 +7,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseSubtitles } from '../src/core/subs.mjs';
 import { extractEmbeddedSub } from '../src/core/media.mjs';
-import { ffmpegAvailable } from '../src/core/ffmpeg.mjs';
 
 test('parses SRT with comma decimals and multi-line cues', () => {
   const cues = parseSubtitles(`1
@@ -207,9 +206,8 @@ test('every Takagi .ja.srt parses completely and cleanly', { skip: takagiSkip },
 });
 
 const mkv = takagiSkip ? null : fs.readdirSync(TAKAGI).find((f) => f.endsWith('.mkv'));
-const assSkip = takagiSkip || (!ffmpegAvailable() && 'ffmpeg not available');
 
-test('the embedded English ASS track splits into dialogue, signs and songs', { skip: assSkip }, async () => {
+test('the embedded English ASS track splits into dialogue, signs and songs', { skip: takagiSkip }, async () => {
   const body = await extractEmbeddedSub(path.join(TAKAGI, mkv), 2);
   const cues = parseSubtitles(body, '.ass');
   const kinds = Object.groupBy(cues, (c) => c.kind);

@@ -3,7 +3,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { lookup, homophones, sharedKanji, glossText } from './dict.mjs';
 import { collocations, continuations } from './corpus.mjs';
-import { clipAudio, clipVideo, screenshot } from './media.mjs';
+import { clipAudio, clipVideo, screenshot, probe } from './media.mjs';
+import { playable } from './playback.mjs';
 import { enrich, llmAvailable } from './llm.mjs';
 import { CARD_TYPES } from './anki.mjs';
 import { getSetting } from './settings.mjs';
@@ -83,7 +84,6 @@ const firstLine = (e) => String(e?.stderr || e?.message || e).trim().split('\n')
  *                                    occurrence when the word appears more than once)
  * @param {number}  [req.entryId]     chosen dictionary entry, defaults to best match
  * @param {string}  [req.translation] from a reference subtitle track, if loaded
- * @param {number}  [req.audioStream] ffprobe stream index of the audio track to clip
  * @param {boolean} [req.includeVideo]
  * @returns {Promise<{cards: object[], skipped: object[], files: string[]}>}
  */
@@ -102,7 +102,6 @@ async function build(req, files) {
     types, mediaPath, mediaTitle, cue, word,
     entryId, includeVideo = false, tokenStart,
   } = req;
-  const audioStream = req.audioStream == null || req.audioStream === '' ? null : Number(req.audioStream);
 
   if (!Array.isArray(types) || !types.length) throw new Error('Pick at least one card type');
   const unknown = types.filter((t) => !CARD_TYPES.includes(t));
@@ -132,14 +131,19 @@ async function build(req, files) {
     fn().then(
       (file) => (file && files.push(file), file),
       (e) => {
-        throw Object.assign(new Error(`Could not extract the ${kind} with ffmpeg: ${firstLine(e)}`), { cause: e });
+        throw Object.assign(new Error(`Could not cut the ${kind}: ${firstLine(e)}`), { cause: e });
       }
     );
 
+  // Clip the audio track Chromium plays, which isn't the first when the first can't be decoded.
+  const track = async () => {
+    const heard = playable(await probe(mediaPath), mediaPath).audio;
+    return heard ? `0:${heard.index}` : undefined;
+  };
   const [audio, image, video] = await Promise.allSettled([
-    wants('audio') ? clip(() => clipAudio(mediaPath, cue.start, cue.end, audioStream), 'audio clip') : null,
+    wants('audio') ? clip(async () => clipAudio(mediaPath, cue.start, cue.end, await track()), 'audio clip') : null,
     wants('image') ? clip(() => screenshot(mediaPath, cue.start, cue.end), 'screenshot') : null,
-    includeVideo && wants('image') ? clip(() => clipVideo(mediaPath, cue.start, cue.end, audioStream), 'video clip') : null,
+    includeVideo && wants('image') ? clip(async () => clipVideo(mediaPath, cue.start, cue.end, await track()), 'video clip') : null,
   ]);
   // No audio is fatal (most types are built around it); a missing frame only costs the picture.
   if (audio.status === 'rejected') throw audio.reason;
@@ -153,7 +157,7 @@ async function build(req, files) {
   const mediaName = (file, kind) =>
     `kotoba_${crypto
       .createHash('sha256')
-      .update(JSON.stringify([mediaPath, cue.start, cue.end, kind, audioStream, padding]))
+      .update(JSON.stringify([mediaPath, cue.start, cue.end, kind, padding]))
       .digest('hex')
       .slice(0, 16)}${path.extname(file)}`;
   const asset = (file, kind, field) =>

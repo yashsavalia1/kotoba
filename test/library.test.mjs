@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { configurePaths, paths } from '../src/core/paths.mjs';
 import { userDb } from '../src/core/db.mjs';
-import { ffmpegPath } from '../src/core/ffmpeg.mjs';
+import { ffmpeg } from '../src/core/ffmpeg.mjs';
 import * as lib from '../src/core/library.mjs';
 import { migrateLegacy } from '../src/core/migrate-legacy.mjs';
 
@@ -29,7 +29,7 @@ const write = (file, body = '') => {
 const MASTER = path.join(TMP, 'master.mkv');
 write(path.join(TMP, 'm.ja.srt'), JA_SRT);
 write(path.join(TMP, 'm.en.srt'), EN_SRT);
-execFileSync(ffmpegPath(), [
+execFileSync(ffmpeg(), [
   '-v', 'error', '-y',
   '-f', 'lavfi', '-i', 'color=c=black:s=64x64:d=2',
   '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=mono',
@@ -277,6 +277,7 @@ test('moved files: auto-relink by basename+size on open and on folder open, loca
   const r2 = lib.openMedia(e2);
   lib.attachSubtitle(r1.id, sub);
   lib.setPrefs(r1.id, { subTrack: `file:${sub}`, rate: 0.75 });
+  userDb().prepare('UPDATE media SET last_opened_at = ? WHERE id = ?').run(Date.now() - 600_000, r1.id); // past a quick look
   lib.setPosition(r1.id, 42, 120);
   userDb().prepare('INSERT INTO line (media_id, idx, start_ms, end_ms, text) VALUES (?, 0, 0, 1000, ?)').run(r1.id, 'からかう');
 
@@ -330,13 +331,12 @@ test('history: recents by last opened; remove/clear hide but keep the record', a
 
 test('per-media prefs are validated', () => {
   const { id } = lib.openMedia(media(path.join(tree('prefs'), 'P.mkv')));
-  assert.deepEqual(lib.setPrefs(id, { subTrack: 'stream:2', refTrack: null, audioTrack: 1, subDelayMs: -250.4, rate: 1.5 }), {
-    subTrack: 'stream:2', refTrack: null, audioTrack: 1, subDelayMs: -250, rate: 1.5,
+  assert.deepEqual(lib.setPrefs(id, { subTrack: 'stream:2', refTrack: null, subDelayMs: -250.4, rate: 1.5 }), {
+    subTrack: 'stream:2', refTrack: null, subDelayMs: -250, rate: 1.5,
   });
-  assert.deepEqual(lib.setPrefs(id, { rate: undefined }), { subTrack: 'stream:2', refTrack: null, audioTrack: 1, subDelayMs: -250 });
+  assert.deepEqual(lib.setPrefs(id, { rate: undefined }), { subTrack: 'stream:2', refTrack: null, subDelayMs: -250 });
   assert.throws(() => lib.setPrefs(id, { volume: 1 }), /unknown pref/);
   assert.throws(() => lib.setPrefs(id, { subTrack: '/etc/passwd' }), /invalid subTrack/);
-  assert.throws(() => lib.setPrefs(id, { audioTrack: -1 }), /invalid audioTrack/);
   assert.throws(() => lib.setPrefs(id, { rate: 10 }), /invalid rate/);
   assert.throws(() => lib.setPrefs(id, { subDelayMs: 'x' }), /invalid subDelayMs/);
   assert.throws(() => lib.setPrefs(id, [1]), /object/);

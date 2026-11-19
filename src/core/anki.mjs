@@ -249,8 +249,9 @@ export function ensureSchema() {
  * @param {object} fields    field name -> html
  * @param {Array}  media     [{ kind:'audio'|'video'|'picture', path, filename, field }]
  * @param {string[]} tags
+ * @param {{ allowDuplicate?: boolean }} [opts]  false: Anki refuses a note whose first field the deck already has
  */
-export async function addNote(type, fields, media = [], tags = []) {
+export async function addNote(type, fields, media = [], tags = [], { allowDuplicate = false } = {}) {
   if (!MODELS[type]) throw new Error(`unknown card type: ${type}`);
   await ensureSchema();
   const note = {
@@ -258,7 +259,7 @@ export async function addNote(type, fields, media = [], tags = []) {
     modelName: modelName(type),
     fields,
     tags: ['kotoba', type, ...tags],
-    options: { allowDuplicate: false, duplicateScope: 'deck' },
+    options: { allowDuplicate, duplicateScope: 'deck' },
   };
   for (const m of media) {
     // AnkiConnect stores the file and appends its reference to the named field.

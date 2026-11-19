@@ -6,16 +6,19 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import http from 'node:http';
+import { execFileSync } from 'node:child_process';
 import { userDb, dictReady } from '../src/core/db.mjs';
 import { configurePaths } from '../src/core/paths.mjs';
-import { setApiKey } from '../src/core/settings.mjs';
+import { setApiKey, setSettings } from '../src/core/settings.mjs';
+import { addNote } from '../src/core/anki.mjs';
+import { startMockAnki } from '../scripts/mock-anki.mjs';
 import { joinCue } from '../src/core/cards.mjs';
 import { parseSubtitles } from '../src/core/subs.mjs';
 import { SAMPLE } from './helpers.mjs';
 import { recordCues, collocations, continuations } from '../src/core/corpus.mjs';
 import { buildCards } from '../src/core/cards.mjs';
 import { displayTitle } from '../src/core/media.mjs';
-import { ffmpegAvailable } from '../src/core/ffmpeg.mjs';
+import { ffmpeg } from '../src/core/ffmpeg.mjs';
 
 const skip = dictReady() ? false : 'dictionary not built - run `npm run dict`';
 const FIXTURE = 999001;
@@ -146,8 +149,7 @@ test('rejects a word with no dictionary entry', { skip }, async () => {
 });
 
 const sample = SAMPLE;
-const mediaSkip = skip || (!ffmpegAvailable() && 'ffmpeg not available')
-  || (!fs.existsSync(sample) && 'sample media not present');
+const mediaSkip = skip || (!fs.existsSync(sample) && 'sample media not present');
 
 test('extracts clips and blanks the target word', { skip: mediaSkip }, async () => {
   const { cards, files } = await buildCards({
@@ -312,33 +314,31 @@ test('a word written in kana in the line is still found by its reading', { skip:
   for (const f of files) fs.rmSync(f, { force: true });
 });
 
-test('media names are content-addressed and the audio track choice is honoured', { skip: mediaSkip }, async () => {
+test('media names are content-addressed', { skip: mediaSkip }, async () => {
   const build = (over = {}) =>
     buildCards({ ...base, mediaPath: sample, types: ['ContextCloze'], translation: 'x', ...over });
   const a = await build();
   const b = await build();
   const c = await build({ cue: { ...cue, start: 1, end: 3 } });
-  const d = await build({ audioStream: 1 });
   const names = (r) => r.cards[0].media.map((m) => m.filename).sort();
   assert.deepEqual(names(a), names(b), 're-mining the same line reuses the same media');
   assert.notDeepEqual(names(a), names(c), 'a different span is a different clip');
-  assert.notDeepEqual(names(a).find((n) => n.endsWith('.mp3')), names(d).find((n) => n.endsWith('.mp3')));
   assert.ok(names(a).every((n) => /^kotoba_[0-9a-f]{16}\.(mp3|jpg)$/.test(n)), names(a).join());
-  for (const r of [a, b, c, d]) for (const f of r.files) fs.rmSync(f, { force: true });
-
-  await assert.rejects(build({ audioStream: 99 }), /Could not extract the audio clip with ffmpeg/);
+  for (const r of [a, b, c]) for (const f of r.files) fs.rmSync(f, { force: true });
 });
 
 test('ffmpeg failure is a clear error and leaves no temp files behind', { skip: mediaSkip }, async () => {
   const before = tempFiles();
   await assert.rejects(
     buildCards({ ...base, mediaPath: '/nonexistent/missing.mkv', types: ['Audio'], translation: 'x' }),
-    /Could not extract the audio clip with ffmpeg: .*No such file/
+    /Could not cut the audio clip: .*no such file/i
   );
-  // Screenshot succeeds, audio fails: the screenshot must not be orphaned.
+  // Screenshot succeeds, audio fails (no audio track): the screenshot must not be orphaned.
+  const silent = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'kotoba-silent-')), 'silent.mkv');
+  execFileSync(ffmpeg(), ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=black:s=64x64:d=4', '-c:v', 'libx264', '-preset', 'ultrafast', silent]);
   await assert.rejects(
-    buildCards({ ...base, mediaPath: sample, audioStream: 99, types: ['ContextCloze', 'Image'], translation: 'x' }),
-    /audio clip/
+    buildCards({ ...base, mediaPath: silent, types: ['ContextCloze', 'Image'], translation: 'x' }),
+    /Could not cut the audio clip/
   );
   assert.deepEqual(tempFiles(), before);
 });
@@ -349,4 +349,27 @@ test('a reference-track translation is used as-is and keeps its line breaks', { 
   });
   assert.equal(cards[0].fields.Translation, 'Honestly,<br>&lt;i&gt;no idea&lt;/i&gt;.');
   for (const f of files) fs.rmSync(f, { force: true });
+});
+
+test('Anki refuses a note whose first field the deck has unless duplicates are allowed', { skip: mediaSkip }, async () => {
+  const mock = await startMockAnki();
+  setSettings({ ankiConnect: mock.url, deckName: 'Kotoba' });
+  const line = { start: 0, end: 3, text: 'いや〜 筆箱が開かなくって' };
+  const mine = async (word, opts) => {
+    const { cards, files } = await buildCards({ ...base, mediaPath: sample, cue: line, word, types: ['ContextCloze'] });
+    try {
+      return await addNote(cards[0].type, cards[0].fields, cards[0].media, [], opts);
+    } finally {
+      for (const f of files) fs.rmSync(f, { force: true });
+    }
+  };
+  try {
+    await mine('筆箱');
+    // Same as Mizune: the first field (the line, HTML stripped) decides, so another word in it counts too.
+    await assert.rejects(mine('開かなく'), (e) => e.code === 'duplicate' && e.message === 'Already in your deck');
+    await mine('開かなく', { allowDuplicate: true });
+    assert.equal(mock.state.notes.length, 2);
+  } finally {
+    await mock.close();
+  }
 });

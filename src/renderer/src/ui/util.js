@@ -59,11 +59,6 @@ export const pickReference = (tracks, prefs, primaryKey) => {
   return tracks.find((t) => t.key === prefs.refTrack) ?? tracks.find((t) => t.key !== primaryKey && isEnglish(t)) ?? null;
 };
 
-export const audioLabel = (a, i) =>
-  [a.title, a.language && a.language !== 'und' ? a.language.toUpperCase() : null, a.codec, a.channels ? `${a.channels}ch` : null]
-    .filter(Boolean)
-    .join(' · ') || `Track ${i + 1}`;
-
 export function ago(ms) {
   if (!ms) return '—';
   const s = (Date.now() - ms) / 1000;

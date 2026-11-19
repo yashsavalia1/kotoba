@@ -38,7 +38,7 @@ function Sentence({ text, word }) {
   );
 }
 
-export default function CardMaker({ ctx, status, covered, onClose, onDone, onError, onSettings }) {
+export default function CardMaker({ ctx, status, covered, onClose, onDone, onError, onSettings, onSaveSettings }) {
   const [selected, setSelected] = useState(() => new Set(store.get('cardTypes', ['ContextCloze']).filter((t) => !NEEDS_LLM.has(t) || status.llm)));
   const [entries, setEntries] = useState(ctx.token.entries ?? []);
   const [entryId, setEntryId] = useState(ctx.token.entries?.[0]?.id ?? null);
@@ -46,6 +46,8 @@ export default function CardMaker({ ctx, status, covered, onClose, onDone, onErr
   const [translation, setTranslation] = useState(ctx.translation ?? '');
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState(null);
+  // A create result Anki flagged duplicates in, held until the user answers.
+  const [dup, setDup] = useState(null);
 
   useEffect(() => {
     if (entries.length) return;
@@ -66,7 +68,6 @@ export default function CardMaker({ ctx, status, covered, onClose, onDone, onErr
     types: [...selected],
     translation: translation.trim(),
     includeVideo,
-    audioStream: ctx.audioStream ?? undefined,
   });
 
   const run = async (label, fn) => {
@@ -83,7 +84,19 @@ export default function CardMaker({ ctx, status, covered, onClose, onDone, onErr
   const doCreate = () =>
     run('create', async () => {
       store.set('cardTypes', [...selected]);
-      onDone(await createCards(body()));
+      const res = await createCards(body());
+      if (res.duplicates?.length) setDup(res);
+      else onDone(res);
+    });
+  // Like Mizune: add them anyway, leave them, or stop asking (which adds them too).
+  const settleDuplicates = (add, never = false) =>
+    run('create', async () => {
+      const held = dup;
+      setDup(null);
+      if (never) onSaveSettings({ warnDuplicates: false });
+      if (!add && !held.added.length) return;
+      const more = add ? await createCards({ ...body(), types: held.duplicates, allowDuplicates: true }) : { added: [], skipped: [] };
+      onDone({ added: [...held.added, ...more.added], skipped: [...held.skipped, ...more.skipped] });
     });
 
   const ankiOff = status.anki == null;
@@ -92,6 +105,14 @@ export default function CardMaker({ ctx, status, covered, onClose, onDone, onErr
   useEffect(() => {
     const onKey = (e) => {
       if (covered) return;
+      if (dup) {
+        if (e.key === 'Escape' || e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          settleDuplicates(e.key === 'Enter');
+        }
+        return;
+      }
       if (e.key === 'Escape') {
         e.stopPropagation();
         onClose();
@@ -233,6 +254,24 @@ export default function CardMaker({ ctx, status, covered, onClose, onDone, onErr
           </button>
         </footer>
       </div>
+      {dup ? (
+        <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && settleDuplicates(false)}>
+          <div className="modal" style={{ width: 'min(420px, 100%)' }} data-testid="duplicate-card" role="alertdialog" aria-modal="true" aria-labelledby="dup-h">
+            <div className="body">
+              <h2 id="dup-h" style={{ margin: '0 0 6px', fontSize: 15 }}>You already have this</h2>
+              <p className="faint" style={{ margin: 0 }}>
+                “{status.deckName}” already has a matching {dup.duplicates.map((t) => TYPES[t]?.[0] ?? t).join(', ')} card.
+              </p>
+            </div>
+            <footer>
+              <button className="btn ghost" onClick={() => settleDuplicates(true, true)}>Never warn me</button>
+              <span className="spacer" />
+              <button className="btn" onClick={() => settleDuplicates(false)}>Cancel</button>
+              <button className="btn primary" onClick={() => settleDuplicates(true)} autoFocus>Add it anyway</button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

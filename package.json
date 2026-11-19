@@ -19,7 +19,6 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.121.0",
     "ffmpeg-static": "^5.3.0",
-    "ffprobe-static": "^3.1.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -28,7 +27,6 @@
     "concurrently": "^9.1.2",
     "electron": "^45.2.3",
     "electron-builder": "^26.18.0",
-    "mp4box": "^2.5.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "vite": "^6.0.7"
@@ -48,8 +46,7 @@
       "src/**/*",
       "!src/renderer/**",
       "out/renderer/**/*",
-      "package.json",
-      "!node_modules/ffprobe-static/bin/**"
+      "package.json"
     ],
     "asarUnpack": [
       "node_modules/ffmpeg-static/ffmpeg"
@@ -72,19 +69,7 @@
           "mp4",
           "m4v",
           "webm",
-          "avi",
           "mov",
-          "wmv",
-          "flv",
-          "ts",
-          "m2ts",
-          "mts",
-          "ogv",
-          "mpg",
-          "mpeg",
-          "3gp",
-          "vob",
-          "divx",
           "mp3",
           "flac",
           "m4a",
@@ -93,14 +78,7 @@
           "oga",
           "opus",
           "wav",
-          "wma",
-          "ac3",
-          "dts",
-          "mka",
-          "ape",
-          "alac",
-          "aiff",
-          "aif"
+          "mka"
         ],
         "role": "Viewer",
         "rank": "Alternate"

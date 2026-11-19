@@ -1,11 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import VideoSurface from '../player/VideoSurface.jsx';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as lib from '../api/library.js';
 import { playbackPlan } from '../api/playback.js';
 import { on } from '../api/ipc.js';
 import Subtitles from './Subtitles.jsx';
 import Icon from './icons.jsx';
-import { audioLabel, cueAt, cueBefore, fmt, isJapanese, isTyping, overlapText, pickPrimary, pickReference, store } from './util.js';
+import { cueAt, cueBefore, fmt, isTyping, overlapText, pickPrimary, pickReference, store } from './util.js';
 
 const SPEEDS = [0.25, 0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 3];
 const IDLE_MS = 2500;
@@ -160,7 +159,9 @@ function Transcript({ cues, index, delay, onSeek, onClose }) {
 
 function Playlist({ items, onOpen, onClose }) {
   const list = useRef(null);
-  useEffect(() => list.current?.querySelector('.current')?.scrollIntoView({ block: 'center' }), [items]);
+  useEffect(() => {
+    list.current?.querySelector('.current')?.scrollIntoView({ block: 'center' });
+  }, [items]);
   return (
     <aside className="drawer" data-testid="playlist" aria-label="Playlist">
       <header>
@@ -184,17 +185,17 @@ export default function Player({ media, settings, mined, active, fullscreen, att
   const video = useRef(null);
   const prefs = media.prefs ?? {};
   const [plan, setPlan] = useState(null);
-  const [surface, setSurface] = useState({ loading: true });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [tracks, setTracks] = useState([]);
   const [primaryKey, setPrimaryKey] = useState(null);
   const [refKey, setRefKey] = useState(null);
   const [subs, setSubs] = useState(null);
   const [refSubs, setRefSubs] = useState(null);
   const [showSubs, setShowSubs] = useState(true);
-  const [showRef, setShowRef] = useState(() => store.get('showRef', false));
+  const [peeking, setPeeking] = useState(false);
   const [delayMs, setDelayMs] = useState(prefs.subDelayMs ?? 0);
   const [rate, setRate] = useState(prefs.rate ?? 1);
-  const [audioStream, setAudioStream] = useState(prefs.audioTrack ?? null);
   const [volume, setVolume] = useState(() => store.get('volume', 1));
   const [muted, setMuted] = useState(() => store.get('muted', false));
   const [playing, setPlaying] = useState(false);
@@ -202,7 +203,6 @@ export default function Player({ media, settings, mined, active, fullscreen, att
   const [duration, setDuration] = useState(media.duration ?? 0);
   const [buffered, setBuffered] = useState([]);
   const [cueIndex, setCueIndex] = useState(-1);
-  const [refIndex, setRefIndex] = useState(-1);
   const [idle, setIdle] = useState(false);
   const [menu, setMenu] = useState(null);
   const [drawer, setDrawer] = useState(() => store.get('drawer', null));
@@ -239,7 +239,7 @@ export default function Player({ media, settings, mined, active, fullscreen, att
         if (!live) return;
         setPlan(p);
         if (p.duration) setDuration(p.duration);
-        setAudioStream((cur) => (p.audio.some((a) => a.index === cur) ? cur : p.audioStream ?? p.audio.find((a) => a.default)?.index ?? p.audio[0]?.index ?? null));
+        if (p.unsupported && (p.video || p.audio)) toast(`${p.unsupported}.`, true);
       })
       .catch((e) => toast(e.message, true));
     lib
@@ -302,9 +302,7 @@ export default function Player({ media, settings, mined, active, fullscreen, att
       if (el) {
         const t = el.currentTime;
         const ci = cueAt(cues, t - delay);
-        const ri = cueAt(refCues, t - delay);
         setCueIndex((p) => (p === ci ? p : ci));
-        setRefIndex((p) => (p === ri ? p : ri));
         if (Math.abs(t - last) > 0.2) {
           last = t;
           setTime(t);
@@ -318,14 +316,15 @@ export default function Player({ media, settings, mined, active, fullscreen, att
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [cues, refCues, delay]);
+  }, [cues, delay]);
 
   const saveProgress = useCallback(() => {
     const el = video.current;
     if (el && didStart.current && Number.isFinite(el.duration)) lib.setPosition(media.id, el.currentTime, el.duration).catch(() => {});
   }, [media.id]);
 
-  useEffect(() => {
+  // A layout cleanup runs before React detaches the video ref, so leaving the player still saves.
+  useLayoutEffect(() => {
     const t = setInterval(() => !video.current?.paused && saveProgress(), 5000);
     return () => {
       clearInterval(t);
@@ -351,7 +350,6 @@ export default function Player({ media, settings, mined, active, fullscreen, att
     el.defaultPlaybackRate = rate;
   }, [rate, plan]);
 
-  useEffect(() => store.set('showRef', showRef), [showRef]);
   useEffect(() => store.set('drawer', drawer), [drawer]);
 
   // ------------------------------------------------------------ actions
@@ -432,14 +430,7 @@ export default function Player({ media, settings, mined, active, fullscreen, att
   const chooseRef = (key) => {
     setRefKey(key);
     savePrefs({ refTrack: key });
-    if (key) setShowRef(true);
-    say(key ? `Secondary: ${tracks.find((t) => t.key === key)?.label}` : 'Secondary subtitles off');
-  };
-  const chooseAudio = (index) => {
-    setAudioStream(index);
-    savePrefs({ audioTrack: index });
-    const i = plan?.audio.findIndex((a) => a.index === index) ?? -1;
-    say(`Audio: ${i >= 0 ? audioLabel(plan.audio[i], i) : index}`);
+    say(key ? `Translation: ${tracks.find((t) => t.key === key)?.label}` : 'Translation off');
   };
   const cycle = (list, cur, pick) => {
     if (!list.length) return say('No other tracks');
@@ -499,10 +490,9 @@ export default function Player({ media, settings, mined, active, fullscreen, att
         cueIndex: i,
         token,
         translation: overlapText(refCues, c.start, c.end),
-        audioStream,
       });
     },
-    [cueIndex, cues, delay, refCues, media.id, media.title, audioStream, onMine]
+    [cueIndex, cues, delay, refCues, media.id, media.title, onMine]
   );
 
   const onHover = useCallback(
@@ -546,13 +536,7 @@ export default function Player({ media, settings, mined, active, fullscreen, att
       setShowSubs((v) => !v);
       say(showSubs ? 'Subtitles hidden' : 'Subtitles shown');
     },
-    'toggle-secondary': () => {
-      if (!refKey) return say('No secondary track: pick one in the subtitles menu');
-      setShowRef((v) => !v);
-      say(showRef ? 'Secondary hidden' : 'Secondary shown');
-    },
     'cycle-subs': () => cycle(tracks.map((t) => t.key), primaryKey, choosePrimary),
-    'cycle-audio': () => cycle(plan?.audio.map((a) => a.index) ?? [], audioStream, chooseAudio),
     'toggle-transcript': () => toggleDrawer('transcript'),
     'toggle-playlist': () => toggleDrawer('playlist'),
     'attach-subtitle': attachSubtitle,
@@ -595,9 +579,9 @@ export default function Player({ media, settings, mined, active, fullscreen, att
         g: a['delay-down'],
         h: a['delay-up'],
         s: a['toggle-subs'],
-        S: a['toggle-secondary'],
+        i: () => setPeeking(true),
+        I: () => setPeeking(true),
         v: a['cycle-subs'],
-        b: a['cycle-audio'],
         t: a['toggle-transcript'],
         p: a['toggle-playlist'],
         '<': a['prev-file'],
@@ -618,6 +602,18 @@ export default function Player({ media, settings, mined, active, fullscreen, att
     return () => window.removeEventListener('keydown', onKey);
   }, [active, seek, duration, menu, drawer, fullscreen, onFullscreen]);
 
+  // Peek is held, not toggled: any release of I ends it, as does losing focus.
+  useEffect(() => {
+    const up = (e) => e.key?.toLowerCase() === 'i' && setPeeking(false);
+    const off = () => setPeeking(false);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', off);
+    return () => {
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', off);
+    };
+  }, []);
+
   // ------------------------------------------------------------ idle chrome
 
   const wake = useCallback(() => {
@@ -636,33 +632,41 @@ export default function Player({ media, settings, mined, active, fullscreen, att
   // ------------------------------------------------------------ render
 
   const tokens = showSubs && cueIndex >= 0 ? subs?.tokens?.[cueIndex] : null;
-  const refText = showSubs && showRef && refIndex >= 0 ? refCues[refIndex].text : null;
+  const cue = showSubs && cueIndex >= 0 ? cues[cueIndex] : null;
+  // Every translation cue overlapping the line on screen by more than 0.1 s (Mizune's rule).
+  const peekText = !cue
+    ? null
+    : !refKey
+      ? 'No translation track. Pick one under Subtitles.'
+      : refCues.filter((r) => r.start < cue.end - 0.1 && r.end > cue.start + 0.1).map((r) => r.text).join('\n') || 'Nothing here in the translation.';
   const chapters = plan?.chapters ?? [];
+  // Whatever part of a file Chromium plays still plays; only a file it plays nothing of fails.
+  const failure = error ?? (plan?.unsupported && !plan.video && !plan.audio ? plan.unsupported : null);
   const sibIndex = siblings.findIndex((s) => s.current);
   const hasPrevFile = lib.adjacent ? true : sibIndex > 0;
   const hasNextFile = lib.adjacent ? true : sibIndex >= 0 && sibIndex < siblings.length - 1;
-  const audio = plan?.audio ?? [];
   const chromeEvents = { onMouseEnter: () => (overChrome.current = true), onMouseLeave: () => (overChrome.current = false) };
 
   return (
     <div className={`player${chromeHidden ? ' idle' : ''}`} data-testid="player" onMouseMove={wake}>
       <div className="stage">
-        {plan ? (
-          <VideoSurface
+        {plan && !failure ? (
+          <video
             ref={video}
-            plan={plan}
-            audioStream={audioStream ?? undefined}
+            src={plan.url}
+            // Without CORS, Web Audio taps and canvas reads of kotoba://media come back silent/tainted.
+            crossOrigin="anonymous"
             autoPlay
             muted={muted}
-            onStatus={setSurface}
-            onError={(m) => toast(m, true)}
+            onLoadedData={() => setLoading(false)}
+            onError={(e) => setError(e.currentTarget.error?.message || 'The player refused this file.')}
             onPlay={() => setPlaying(true)}
             onPause={() => {
               setPlaying(false);
               saveProgress();
             }}
-            onWaiting={() => setSurface((s) => ({ ...s, loading: true }))}
-            onPlaying={() => setSurface((s) => ({ ...s, loading: false }))}
+            onWaiting={() => setLoading(true)}
+            onPlaying={() => setLoading(false)}
             onDurationChange={(e) => Number.isFinite(e.currentTarget.duration) && setDuration(e.currentTarget.duration)}
             onLoadedMetadata={(e) => {
               const el = e.currentTarget;
@@ -687,15 +691,22 @@ export default function Player({ media, settings, mined, active, fullscreen, att
             style={plan.video ? undefined : { opacity: 0 }}
           />
         ) : null}
-        {plan && !plan.video ? <div className="audio-art">♪</div> : null}
-        {!plan || surface.loading ? <div className="spinner" role="status" aria-label="Loading" /> : null}
+        {failure ? (
+          <div className="unplayable" role="alert" data-testid="unplayable">
+            <b>Kotoba can't play this file</b>
+            {failure}
+          </div>
+        ) : plan && !plan.video ? (
+          <div className="audio-art">♪</div>
+        ) : null}
+        {!failure && (!plan || loading) ? <div className="spinner" role="status" aria-label="Loading" /> : null}
         {flash ? (
           <div className="center-flash" key={flash.k}>
             <span><Icon name={flash.icon} size={34} /></span>
           </div>
         ) : null}
 
-        <Subtitles tokens={tokens} refText={refText} fontSize={fontSize} mined={mined} onMine={mine} onHover={onHover} />
+        <Subtitles tokens={tokens} peeking={peeking} peekText={peekText} onPeek={setPeeking} fontSize={fontSize} mined={mined} onMine={mine} onHover={onHover} />
 
         {osd ? <div className="osd" role="status">{osd}</div> : null}
         {resumed != null ? (
@@ -723,7 +734,6 @@ export default function Player({ media, settings, mined, active, fullscreen, att
             </button>
             <div className="ttl" title={media.path}>
               {media.title}
-              {surface.mode === 'stream' ? <small title={plan?.reason ?? ''}>streamed</small> : null}
             </div>
             <span className="spacer" />
             <button className={`icon-btn${drawer === 'transcript' ? ' on' : ''}`} onClick={() => toggleDrawer('transcript')} aria-label="Transcript (T)" title="Transcript (T)" aria-pressed={drawer === 'transcript'}>
@@ -764,17 +774,6 @@ export default function Player({ media, settings, mined, active, fullscreen, att
               ))}
             </Pop>
 
-            {audio.length > 1 ? (
-              <Pop id="audio" open={menu === 'audio'} setOpen={setMenu} label="Audio track (B)" button={(p) => <button className="icon-btn" {...p}><Icon name="audio" /></button>}>
-                <h4>Audio</h4>
-                {audio.map((a, i) => (
-                  <Opt key={a.index} checked={a.index === audioStream} onClick={() => chooseAudio(a.index)} hint={isJapanese({ language: a.language, label: a.title }) ? 'target' : null}>
-                    {audioLabel(a, i)}
-                  </Opt>
-                ))}
-              </Pop>
-            ) : null}
-
             <Pop id="subs" open={menu === 'subs'} setOpen={setMenu} label="Subtitles (V)" button={(p) => <button className={`icon-btn${showSubs && primaryKey ? '' : ' off'}`} {...p}><Icon name="subs" /></button>}>
               <h4>Subtitles</h4>
               <Opt checked={!primaryKey} onClick={() => choosePrimary(null)}>Off</Opt>
@@ -782,18 +781,11 @@ export default function Player({ media, settings, mined, active, fullscreen, att
                 <Opt key={t.key} checked={t.key === primaryKey} onClick={() => choosePrimary(t.key)} hint={t.source}>{t.label}</Opt>
               ))}
               <hr />
-              <h4>Secondary (shown under the line, fills card translations)</h4>
+              <h4>Translation (hold I to peek; fills card translations)</h4>
               <Opt checked={!refKey} onClick={() => chooseRef(null)}>None</Opt>
               {tracks.filter((t) => t.key !== primaryKey).map((t) => (
                 <Opt key={t.key} checked={t.key === refKey} onClick={() => chooseRef(t.key)} hint={t.source}>{t.label}</Opt>
               ))}
-              {refKey ? (
-                <label className="line">
-                  <input type="checkbox" checked={showRef} onChange={(e) => setShowRef(e.target.checked)} />
-                  <span className="lbl">Show secondary line</span>
-                  <kbd>⇧S</kbd>
-                </label>
-              ) : null}
               <hr />
               <Stepper label="Delay" value={`${delayMs > 0 ? '+' : ''}${delayMs} ms`} onMinus={() => changeDelay(delayMs - 100)} onPlus={() => changeDelay(delayMs + 100)} onReset={() => changeDelay(0)} />
               <Stepper label="Size" value={`${fontSize}px`} onMinus={() => changeFont(-2)} onPlus={() => changeFont(2)} onReset={() => onSettings({ subtitleFontSize: 30 })} />

@@ -1,7 +1,7 @@
 # 言葉 kotoba
 
-Migaku-style sentence mining for **your own media files**. Play anything VLC can
-play, hover a word in the subtitles to get its definition, and turn the line into
+Migaku-style sentence mining for **your own media files**. Play a video or audio
+file, hover a word in the subtitles to get its definition, and turn the line into
 Anki cards — with the audio clip, the frame, and the sentence attached.
 
 Twelve card types, not one. Most of them are built from the dictionary and from
@@ -18,14 +18,15 @@ no mouse events at all; C modules get native power but cannot extend the Qt UI,
 so a dictionary popup would mean maintaining a VLC fork.
 
 Migaku sidesteps this by being a browser extension — it re-renders subtitles as
-DOM, which makes hover free. Kotoba uses the same trick locally: ffmpeg decodes,
-a `<video>` element plays, and the subtitles are HTML on top.
+DOM, which makes hover free. Kotoba uses the same trick locally: a `<video>`
+element plays, and the subtitles are HTML on top.
 
 ---
 
 ## Setup
 
-Requires **Node 22.13+** and **ffmpeg** on your PATH.
+Requires **Node 22.13+**. ffmpeg is bundled; in a fresh checkout, fetch the
+matching ffprobe once with `node build/fetch-ffprobe.mjs`.
 
 ```bash
 npm install
@@ -74,39 +75,47 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 ## Playback
 
-Anything ffmpeg can demux. Files the browser can already decode are streamed
-directly with range requests; anything else (mkv, ac3, dts, opus, hevc-in-mkv…)
-is remuxed to mp4 on first open — a stream copy, so it is near-instant — and
-cached under `cache/`. Only a genuinely unplayable video codec triggers a real
-transcode, and the UI shows progress for it.
+Chromium's own player, nothing in between: mkv, mp4, m4v, webm and mov video, and
+mp3, flac, m4a, aac, ogg, oga, opus, wav and mka audio. Kotoba refuses other files
+(avi, ts, wmv…) and says so. When a file holds something Chromium can't decode,
+such as AC3 or DTS audio or MPEG-2 video, the player says what, and plays whatever
+part it can. Only the first audio track Chromium can decode plays.
 
-Three things the conversion gets right that ffmpeg's defaults do not:
-
-- **Audio is chosen by language, not by channel count.** On a dual-audio release
-  ffmpeg's default mapping will happily hand you the English dub. The target
-  language comes from `targetLang` in the config.
-- **HEVC is retagged `hvc1`.** The bitstream is identical, but Safari and some
-  Chrome builds refuse the `hev1` sample entry name that ffmpeg writes by default.
-- **Subtitles, attachments and chapters are dropped.** Matroska chapters
-  otherwise land in the mp4 as a stray `bin_data` track.
-
-**The cache grows to roughly the size of what you watch.** A 12-episode BD season
-is ~19 GB converted. The header shows the current size; `npm run clean` empties
-it, and anything deleted is just rebuilt on next open.
+ffmpeg stays behind the scenes: it lists tracks and chapters, reads embedded text
+subtitles, cuts each card's audio clip, video clip and screenshot, and makes the
+library thumbnails.
 
 | key | |
 |---|---|
 | `space` / `k` | play / pause |
-| `←` `→` | seek 5s (hold shift for 1s) |
+| `←` `→` | seek 5 s (`⇧` 1 s, `⌥` 30 s); `j` `l` seek 10 s |
 | `,` `.` | previous / next subtitle line |
 | `r` | replay the current line |
-| `↑` `↓` | playback speed (0.5×–2×) |
-| `m` | mute |
-| `s` | toggle subtitles |
+| hold `i` | peek at the translation line, in place of the Japanese |
+| `[` `]` `=` | slower / faster / normal speed |
+| `↑` `↓` `m` | volume / mute |
+| `g` `h` | subtitle delay −/+ 100 ms |
+| `s` | show / hide subtitles |
+| `v` | next subtitle track |
 | `e` | make cards from the hovered word |
+| `t` `p` | transcript / playlist drawer |
+| `<` `>` | previous / next file in the folder |
+| `?` | every shortcut |
 
-Speed, volume, "pause on hover", and the subtitle track picker are in the
-control bar. Clicking a line in the list below jumps to it.
+Holding the subtitle line with the mouse peeks too. The translation track is picked in
+the subtitles menu (an English track is chosen automatically when there is one); it also
+fills the cards' Translation field.
+
+## Library
+
+Choose a media folder once (the library's first screen, or Settings › Library). Each
+folder in it is a show and folders inside those are seasons, browsed with breadcrumbs.
+Every video gets a frame thumbnail; Continue watching keeps one card per show at the
+point you stopped. Names are tidied (release groups, `1080p` and the like dropped,
+episodes numbered), and videos carry watched ticks and progress lines. Right-click a
+card to play from the start, mark watched, clear progress, show it in Finder or copy
+its path. Files dropped on the window or opened with ⌘O play too, without joining the
+library.
 
 ---
 
@@ -175,24 +184,18 @@ reason rather than emitted half-empty.
 
 ## Layout
 
+Electron 45: plain Node ESM in `src/core` (runs under `node --test`), the main process in
+`src/main`, a sandboxed React renderer in `src/renderer`. The whole map, the IPC table and
+the data stores are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ```
-server/
-  index.mjs      HTTP routes
-  config.mjs     kotoba.config.json + defaults
-  db.mjs         SQLite schema (node:sqlite - no native deps)
-  media.mjs      library scan, probe, remux-to-cache, clip extraction
-  subs.mjs       SRT / VTT / ASS parsing
-  deinflect.mjs  the inflection rule table and search
-  dict.mjs       lookup, segmentation, homophones, shared-kanji
-  corpus.mjs     watched-subtitle index behind cards 7 and 11
-  cards.mjs      the twelve generators
-  llm.mjs        Claude, for cards 2, 6 and 10
-  anki.mjs       AnkiConnect + the twelve note types
-web/src/         React: Player, Subtitles (hover + popup), CardMaker
-scripts/
-  build-dict.mjs  npm run dict
-  e2e.mjs         smoke run against a live server
-  mock-anki.mjs   stand-in for AnkiConnect, for testing without Anki
+src/core/       dictionary, segmentation, subtitles, library, cards, Anki, Claude, ffmpeg
+src/main/       window, kotoba:// protocol, IPC, menu, log
+src/preload/    window.kotoba bridge
+src/renderer/   React: Home (library), Player, Subtitles, CardMaker, Settings
+scripts/        dictionary build, playback fixtures and checks, screenshots, mock Anki
+test/           node --test unit tests
+e2e/            Playwright against the dev build or the packaged app
 ```
 
 ## Tests
@@ -201,17 +204,19 @@ scripts/
 npm test
 ```
 
-28 tests covering deinflection, subtitle parsing, segmentation, the card
-generators, and the corpus queries. Dictionary-dependent tests skip cleanly if
-you have not run `npm run dict`.
+Unit tests cover deinflection, segmentation, subtitle parsing, titles and watch
+rules, the library scan, the card generators, Anki and the corpus queries.
+Dictionary-dependent tests skip cleanly if you have not run `npm run dict`.
 
-For the whole path including ffmpeg and Anki:
+End to end, with Playwright driving the real app against a mock AnkiConnect:
 
 ```bash
-npm run mock-anki    # in one terminal, if Anki is not running
-npm start            # in another
-npm run e2e
+npm run e2e                                   # dev build
+npm run dist && npx playwright test --project=packaged
 ```
+
+The e2e suite plays `sample/Shoujiki S01E01.mkv` (H.264 + AAC with a Japanese
+subtitle track), which is gitignored; put any short clip like that there first.
 
 ## Known ceilings
 
@@ -225,8 +230,7 @@ npm run e2e
   in its npm script. It runs once.
 - **Bitmap subtitles (PGS, VobSub) are ignored** — there is no text to hover.
   OCR would be a separate project.
-- **Proper nouns are missing.** JMdict has no names, so `西片` segments as
-  西 + 片. jmnedict (same publisher, 13 MB) would fix it at the cost of ~700k
-  entries of place and person names crowding the popup — not loaded by default.
+- **One audio track.** Chromium plays the first audio track it can decode; there
+  is no track switching.
 - **Japanese only.** The deinflection table and JMdict are both language-specific;
   the player, clipping, and Anki layers are not.

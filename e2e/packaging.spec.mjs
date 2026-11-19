@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { test, expect, invoke, ROOT } from './fixtures.mjs';
 import { MEDIA_EXTS } from '../src/core/media.mjs';
 import { SUB_EXTS } from '../src/core/subs.mjs';
@@ -15,7 +16,7 @@ test('fileAssociations cover every media and subtitle extension', ({ executable 
 test('packaged app uses bundled native ffmpeg/ffprobe and a read-only dictionary', async ({ executable, launch }) => {
   test.skip(!executable, 'packaged project only');
   const { app, page } = await launch();
-  expect(await invoke(page, 'app:status')).toMatchObject({ dictReady: true, ffmpeg: true });
+  expect(await invoke(page, 'app:status')).toMatchObject({ dictReady: true });
 
   const info = await app.evaluate(async ({ app }, urls) => {
     // evaluate() has no dynamic import; require(esm) shares the app's module instances.
@@ -28,12 +29,10 @@ test('packaged app uses bundled native ffmpeg/ffprobe and a read-only dictionary
     } catch (e) {
       writeError = e.message;
     }
-    const bins = { ffmpeg: ff.ffmpegPath(), ffprobe: ff.ffprobePath() };
     return {
       isPackaged: app.isPackaged,
       resources: process.resourcesPath,
-      bins,
-      arch: { ffmpeg: ff.machoArch(bins.ffmpeg), ffprobe: ff.machoArch(bins.ffprobe), process: process.arch },
+      bins: { ffmpeg: ff.ffmpeg(), ffprobe: ff.ffprobe() },
       writeError,
     };
   }, {
@@ -44,6 +43,6 @@ test('packaged app uses bundled native ffmpeg/ffprobe and a read-only dictionary
   expect(info.isPackaged).toBe(true);
   expect(info.bins.ffmpeg).toBe(path.join(info.resources, 'app.asar.unpacked/node_modules/ffmpeg-static/ffmpeg'));
   expect(info.bins.ffprobe).toBe(path.join(info.resources, 'bin/ffprobe'));
-  expect(info.arch).toEqual({ ffmpeg: info.arch.process, ffprobe: info.arch.process, process: info.arch.process });
+  for (const bin of Object.values(info.bins)) expect(execFileSync('lipo', ['-archs', bin]).toString().trim()).toBe(process.arch);
   expect(info.writeError).toMatch(/readonly/i);
 });

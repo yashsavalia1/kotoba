@@ -35,7 +35,9 @@ const USER_SCHEMA = `
     added_at       INTEGER NOT NULL,
     last_opened_at INTEGER,
     position       REAL NOT NULL DEFAULT 0,
-    prefs          TEXT NOT NULL DEFAULT '{}'
+    prefs          TEXT NOT NULL DEFAULT '{}',
+    watched        INTEGER NOT NULL DEFAULT 0,
+    played_at      INTEGER  -- last saved sitting; Continue watching, newest first
   );
 
   -- Subtitle files the user attached by hand (Add Subtitle File…, drag-drop).
@@ -97,8 +99,23 @@ export function userDb() {
   if (!user) {
     user = new DatabaseSync(path.join(paths.userDataDir, 'user.db'));
     user.exec(USER_SCHEMA);
+    migrateUser(user);
   }
   return user;
+}
+
+/** Databases from before the library model get the watched flag and Continue watching, from what they had. */
+function migrateUser(db) {
+  if (db.prepare('PRAGMA table_info(media)').all().some((c) => c.name === 'watched')) return;
+  transaction(db, () =>
+    db.exec(`
+      ALTER TABLE media ADD COLUMN watched INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE media ADD COLUMN played_at INTEGER;
+      UPDATE media SET watched = 1, position = 0
+        WHERE position > 0 AND duration > 0 AND duration - position < min(max(duration / 10, 30), 300);
+      UPDATE media SET played_at = last_opened_at WHERE position > 0;
+    `)
+  );
 }
 
 export function dictReady() {

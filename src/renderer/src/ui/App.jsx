@@ -13,11 +13,15 @@ import { isTyping } from './util.js';
 const toggleFullscreen = () =>
   (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
 
+const SEP = window.kotoba?.platform === 'win32' ? '\\' : '/';
+/** The library folder to show for `dir`: itself when it is inside the library, else the top (null). */
+const libraryFolder = (root, dir) => (root && dir && dir !== root && dir.startsWith(root.replace(/[\\/]$/, '') + SEP) ? dir : null);
+
 export default function App() {
   const [status, setStatus] = useState(null);
   const [settings, setSettings] = useState(null);
   const [bootError, setBootError] = useState(null);
-  const [library, setLibrary] = useState([]);
+  const [folder, setFolder] = useState(null);
   const [media, setMedia] = useState(null);
   const [mining, setMining] = useState(null);
   const [modal, setModal] = useState(null);
@@ -39,13 +43,10 @@ export default function App() {
     setStatus(s);
     return s;
   }, []);
-  const refreshLibrary = useCallback(() => lib.listMedia().then(setLibrary).catch((e) => toast(e.message, true)), [toast]);
-
   useEffect(() => {
     Promise.all([refreshStatus(), core.getSettings().then(setSettings)]).catch((e) => setBootError(e.message));
-    refreshLibrary();
     core.minedWords().then((w) => setMined(new Set(w))).catch(() => {});
-  }, [refreshStatus, refreshLibrary]);
+  }, [refreshStatus]);
 
   const saveSettings = useCallback(
     (patch) => {
@@ -54,44 +55,52 @@ export default function App() {
         .setSettings(patch)
         .then((s) => {
           setSettings(s);
-          if ('ankiConnect' in patch || 'deckName' in patch || 'ffmpegPath' in patch) refreshStatus().catch(() => {});
+          if ('ankiConnect' in patch || 'deckName' in patch) refreshStatus().catch(() => {});
         })
         .catch((e) => toast(e.message, true));
     },
     [refreshStatus, toast]
   );
 
+  const chooseRoot = useCallback(async () => {
+    try {
+      const s = await lib.chooseLibraryRoot();
+      if (!s) return;
+      setSettings(s);
+      setFolder(null);
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }, [toast]);
+
   const open = useCallback(
     async (id) => {
       try {
         const m = await lib.getMedia(id);
         if (!m) throw new Error('That file is no longer in the library.');
-        if (!m.exists) {
-          refreshLibrary();
-          setMedia(null);
-          throw new Error(`File is missing: ${m.path}`);
-        }
+        if (!m.exists) throw new Error(`File is missing: ${m.path}`);
         setMining(null);
         setAttached(null);
         setMedia(m);
-        refreshLibrary();
       } catch (e) {
         toast(e.message, true);
       }
     },
-    [refreshLibrary, toast]
+    [toast]
   );
 
-  const goHome = useCallback(() => {
+  // Back from the player comes out in the video's folder, Continue watching's too.
+  const goHome = () => {
+    if (media) setFolder(libraryFolder(settings?.libraryRoot, media.folder));
     setMedia(null);
-    refreshLibrary();
-  }, [refreshLibrary]);
+  };
 
   useEffect(() => {
     document.title = media ? `${media.title} · Kotoba` : 'Kotoba';
   }, [media]);
 
   useEffect(() => on('evt:open-media', ({ id }) => open(id)), [open]);
+  useEffect(() => on('evt:error', (message) => toast(message, true)), [toast]);
 
   const commands = useRef({});
   commands.current = {
@@ -145,18 +154,17 @@ export default function App() {
       try {
         const kinds = await lib.classify(paths);
         const subs = kinds.filter((k) => k.kind === 'subtitle');
-        const mediaPaths = kinds.filter((k) => k.kind === 'media' || k.kind === 'folder').map((k) => k.path);
-        if (subs.length && !mediaPaths.length) {
+        const rest = kinds.filter((k) => k.kind !== 'subtitle').map((k) => k.path);
+        if (subs.length && !rest.length) {
           if (!media) return toast('Open a video first, then drop its subtitle file.', true);
           let key = null;
           for (const s of subs) key = await lib.attachSubtitle(media.id, s.path);
           setAttached({ key, n: Date.now() });
           return;
         }
-        if (mediaPaths.length) {
-          const recs = await lib.openPaths(mediaPaths);
-          if (!recs?.length) toast('Nothing playable in what was dropped.', true);
-        } else toast('Kotoba plays video and audio files, or folders of them.', true);
+        // Main refuses the files it can't play with its own evt:error.
+        const recs = await lib.openPaths(rest);
+        if (!recs?.length && kinds.some((k) => k.kind === 'media' || k.kind === 'folder')) toast('Nothing playable in what was dropped.', true);
       } catch (err) {
         toast(err.message, true);
       }
@@ -210,10 +218,11 @@ export default function App() {
         />
       ) : (
         <Home
-          library={library}
           status={status}
-          onOpen={open}
-          onRefresh={refreshLibrary}
+          settings={settings}
+          folder={folder}
+          onFolder={setFolder}
+          onChooseRoot={chooseRoot}
           onSettings={() => setModal('settings')}
           onShortcuts={() => setModal('shortcuts')}
           toast={toast}
@@ -229,10 +238,11 @@ export default function App() {
           onDone={onDone}
           onError={(m) => toast(m, true)}
           onSettings={() => setModal('settings')}
+          onSaveSettings={saveSettings}
         />
       ) : null}
       {modal === 'settings' ? (
-        <Settings settings={settings} status={status} onSave={saveSettings} onStatus={refreshStatus} onClose={() => setModal(null)} toast={toast} />
+        <Settings settings={settings} status={status} onSave={saveSettings} onChooseRoot={chooseRoot} onStatus={refreshStatus} onClose={() => setModal(null)} toast={toast} />
       ) : null}
       {modal === 'shortcuts' ? <Shortcuts onClose={() => setModal(null)} /> : null}
 

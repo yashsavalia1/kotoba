@@ -8,6 +8,7 @@ import { registerProtocol, registerPlaybackIpc } from './protocol.mjs';
 import { registerCoreIpc, loadApiKey } from './ipc-core.mjs';
 import { registerLibraryIpc, openPaths, argvFiles } from './files.mjs';
 import { buildMenu } from './menu.mjs';
+import { startLog, logRenderer } from './log.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEV_URL = process.env.KOTOBA_RENDERER_URL;
@@ -22,11 +23,11 @@ const ICON = path.join(ROOT, 'build', 'icon.png');
 // parallel dev/test instances their own profile (and single-instance lock).
 app.setName(APP_NAME);
 app.setPath('userData', process.env.KOTOBA_USER_DATA || path.join(app.getPath('appData'), 'kotoba'));
+startLog();
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'kotoba', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
 ]);
-app.commandLine.appendSwitch('enable-blink-features', 'AudioVideoTracks');
 
 let mainWindow = null;
 let ready = false;
@@ -83,6 +84,7 @@ function createWindow() {
     mainWindow.showInactive();
   });
   mainWindow.on('closed', () => (mainWindow = null));
+  logRenderer(mainWindow.webContents);
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/.test(url)) shell.openExternal(url);

@@ -6,6 +6,7 @@ import { paths } from './paths.mjs';
 import { getSettings } from './settings.mjs';
 import { SUB_EXTS, parseSubtitles } from './subs.mjs';
 import { displayTitle, isMediaFile, probe, extractEmbeddedSub, decodeSubFile, BITMAP_SUB_CODECS } from './media.mjs';
+import { finished, skimmed } from './watch.mjs';
 
 const now = () => Date.now();
 const MAX_DIR_ENTRIES = 5000;
@@ -14,7 +15,7 @@ const MAX_SUB_BYTES = 32 << 20;
 export const isSubtitleFile = (p) => SUB_EXTS.includes(path.extname(p).toLowerCase());
 export const naturalCompare = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 
-function statSafe(p) {
+export function statSafe(p) {
   try {
     return fs.statSync(p);
   } catch {
@@ -22,7 +23,7 @@ function statSafe(p) {
   }
 }
 
-function readDir(dir) {
+export function readDir(dir) {
   try {
     return fs.readdirSync(dir, { withFileTypes: true }).filter((e) => !e.name.startsWith('.')).slice(0, MAX_DIR_ENTRIES);
   } catch {
@@ -31,7 +32,7 @@ function readDir(dir) {
 }
 
 // Directory entries may be symlinks; follow them for files, never for directories (no loops).
-const isFileEntry = (dir, e) => e.isFile() || (e.isSymbolicLink() && statSafe(path.join(dir, e.name))?.isFile());
+export const isFileEntry = (dir, e) => e.isFile() || (e.isSymbolicLink() && statSafe(path.join(dir, e.name))?.isFile());
 
 function statFile(abs) {
   const st = statSafe(abs);
@@ -54,13 +55,14 @@ const hydrate = (row) =>
     lastOpenedAt: row.last_opened_at,
     position: row.position,
     prefs: JSON.parse(row.prefs || '{}'),
+    watched: Boolean(row.watched),
     exists: fs.existsSync(row.path),
   };
 
-const idByPath = (abs) => userDb().prepare('SELECT id FROM media WHERE path = ?').get(abs)?.id;
+export const idByPath = (abs) => userDb().prepare('SELECT id FROM media WHERE path = ?').get(abs)?.id;
 
 /** Register a file without marking it opened (no history entry for new rows). Relinks moved records. */
-function register(abs, st) {
+export function register(abs, st) {
   const db = userDb();
   let id = idByPath(abs);
   if (id == null) {
@@ -125,10 +127,21 @@ export function isKnownFolder(dir) {
     .some((r) => path.dirname(r.path) === d);
 }
 
+/**
+ * Where a video stopped. A sitting (since it was opened) too short to count leaves it as it was;
+ * stopping in its last stretch marks it watched and starts it over next time.
+ */
 export function setPosition(id, position, duration) {
-  userDb()
-    .prepare('UPDATE media SET position = ?, duration = coalesce(?, duration) WHERE id = ?')
-    .run(Math.max(0, Number(position) || 0), Number.isFinite(duration) ? duration : null, Number(id));
+  const db = userDb();
+  const row = db.prepare('SELECT duration, last_opened_at FROM media WHERE id = ?').get(Number(id));
+  if (!row) return;
+  const known = Number.isFinite(duration) ? duration : null;
+  const dur = known ?? row.duration ?? 0;
+  const pos = Math.max(0, Number(position) || 0);
+  db.prepare('UPDATE media SET duration = coalesce(?, duration) WHERE id = ?').run(known, Number(id));
+  if (row.last_opened_at != null && skimmed((now() - row.last_opened_at) / 1000, dur)) return;
+  if (finished(pos, dur)) db.prepare('UPDATE media SET position = 0, watched = 1, played_at = ? WHERE id = ?').run(now(), Number(id));
+  else db.prepare('UPDATE media SET position = ?, played_at = ? WHERE id = ?').run(pos, now(), Number(id));
 }
 
 const TRACK_KEY = /^(file:.+|stream:\d+)$/;
@@ -136,7 +149,6 @@ const isTrackKey = (v) => v === null || (typeof v === 'string' && TRACK_KEY.test
 const PREF_RULES = {
   subTrack: isTrackKey,
   refTrack: isTrackKey,
-  audioTrack: (v) => v === null || (Number.isInteger(v) && v >= 0),
   subDelayMs: (v) => Number.isFinite(v) && Math.abs(v) <= 600_000,
   rate: (v) => Number.isFinite(v) && v >= 0.25 && v <= 4,
 };
@@ -294,7 +306,7 @@ const SDH = new Set(['sdh', 'cc', 'hoh']);
 const langDisplay = new Intl.DisplayNames(['en'], { type: 'language' });
 
 // `ja-JP`, `en_US`, `zh-Hans` → their primary subtag.
-export const langOfTag = (t) => LANG_OF.get(t.toLowerCase().replace(/^([a-z]{2,3})[-_][a-z]{2,4}$/, '$1')) ?? null;
+const langOfTag = (t) => LANG_OF.get(t.toLowerCase().replace(/^([a-z]{2,3})[-_][a-z]{2,4}$/, '$1')) ?? null;
 const isTag = (t) => langOfTag(t) != null || FORCED.has(t.toLowerCase()) || SDH.has(t.toLowerCase());
 
 /** Stem without extension or trailing `.ja.forced`-style tags. */

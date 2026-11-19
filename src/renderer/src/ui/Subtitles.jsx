@@ -41,12 +41,20 @@ function Popup({ anchor, token, mined, onEnter, onLeave, onMine }) {
   );
 }
 
-/** The hoverable subtitle line. Tokens were segmented in main when the track loaded. */
-export default function Subtitles({ tokens, refText, fontSize, mined, onMine, onHover }) {
+const LONG_PRESS_MS = 350;
+
+/**
+ * The hoverable subtitle line. Tokens were segmented in main when the track loaded. While peeking,
+ * the translation fades in over the line in the same box, which is sized for the larger of the two.
+ */
+export default function Subtitles({ tokens, peeking, peekText, onPeek, fontSize, mined, onMine, onHover }) {
   const [hover, setHover] = useState(null);
   const closeTimer = useRef(null);
+  const pressTimer = useRef(null);
+  const pressed = useRef(false);
 
   const open = (token, el) => {
+    if (peeking) return;
     clearTimeout(closeTimer.current);
     setHover({ token, anchor: el.getBoundingClientRect() });
     onHover(token);
@@ -67,13 +75,50 @@ export default function Subtitles({ tokens, refText, fontSize, mined, onMine, on
     return () => clearTimeout(closeTimer.current);
   }, [tokens]);
 
-  if (!tokens?.length && !refText) return null;
+  useEffect(() => {
+    if (!peeking) return;
+    setHover(null);
+    onHover(null);
+  }, [peeking]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Holding the line peeks too. Capturing the pointer once the hold starts keeps the peek until
+  // release wherever the cursor drifts, and sends the release's click to the line, not a word.
+  const pressStart = (e) => {
+    if (e.button !== 0) return;
+    const { currentTarget: el, pointerId } = e;
+    pressed.current = false;
+    clearTimeout(pressTimer.current);
+    pressTimer.current = setTimeout(() => {
+      try {
+        el.setPointerCapture(pointerId);
+      } catch { /* released in the meantime */ }
+      pressed.current = true;
+      onPeek(true);
+    }, LONG_PRESS_MS);
+  };
+  const pressEnd = () => {
+    clearTimeout(pressTimer.current);
+    if (pressed.current) onPeek(false);
+  };
+  useEffect(() => () => clearTimeout(pressTimer.current), []);
+
+  if (!tokens?.length) return null;
 
   return (
     <>
       <div className="subs">
-        {tokens?.length ? (
-          <div className="subline jp" style={{ fontSize }} data-testid="subtitle-line" onDoubleClick={(e) => e.stopPropagation()}>
+        <div
+          className={`subline jp${peeking ? ' peeking' : ''}`}
+          style={{ fontSize }}
+          data-testid="subtitle-line"
+          onDoubleClick={(e) => e.stopPropagation()}
+          onPointerDown={pressStart}
+          onPointerUp={pressEnd}
+          onPointerLeave={pressEnd}
+          onPointerCancel={pressEnd}
+          onLostPointerCapture={pressEnd}
+        >
+          <span className="layer line" aria-hidden={peeking}>
             {tokens.map((t, i) => {
               if (!t.entries.length) return <span key={i} className="tok">{t.text}</span>;
               const cls = `tok known${isMined(mined, t) ? ' mined' : ''}${hover?.token === t ? ' active' : ''}`;
@@ -86,6 +131,7 @@ export default function Subtitles({ tokens, refText, fontSize, mined, onMine, on
                   onMouseLeave={scheduleClose}
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (pressed.current) return void (pressed.current = false);
                     onMine(t);
                   }}
                 >
@@ -93,9 +139,9 @@ export default function Subtitles({ tokens, refText, fontSize, mined, onMine, on
                 </span>
               );
             })}
-          </div>
-        ) : null}
-        {refText ? <div className="refline" style={{ fontSize: Math.round(fontSize * 0.55) }}>{refText}</div> : null}
+          </span>
+          <span className="layer peek" aria-hidden={!peeking} data-testid="peek-line">{peekText}</span>
+        </div>
       </div>
       {hover ? (
         <Popup anchor={hover.anchor} token={hover.token} mined={mined} onEnter={cancelClose} onLeave={scheduleClose} onMine={onMine} />

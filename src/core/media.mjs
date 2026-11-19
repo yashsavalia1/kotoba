@@ -5,12 +5,13 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { paths } from './paths.mjs';
 import { getSetting } from './settings.mjs';
-import { ffmpegPath, ffprobePath } from './ffmpeg.mjs';
+import { ffmpeg, ffprobe } from './ffmpeg.mjs';
 
 const run = promisify(execFile);
 
-export const VIDEO_EXTS = ['.mkv', '.mp4', '.m4v', '.webm', '.avi', '.mov', '.wmv', '.flv', '.ts', '.m2ts', '.mts', '.ogv', '.mpg', '.mpeg', '.3gp', '.vob', '.divx'];
-export const AUDIO_EXTS = ['.mp3', '.flac', '.m4a', '.aac', '.ogg', '.oga', '.opus', '.wav', '.wma', '.ac3', '.dts', '.mka', '.ape', '.alac', '.aiff', '.aif'];
+// Containers Chromium opens (scripts/verify-playback.mjs); avi, flv, ts, m2ts and wmv it can't.
+export const VIDEO_EXTS = ['.mkv', '.mp4', '.m4v', '.webm', '.mov'];
+export const AUDIO_EXTS = ['.mp3', '.flac', '.m4a', '.aac', '.ogg', '.oga', '.opus', '.wav', '.mka'];
 export const MEDIA_EXTS = [...VIDEO_EXTS, ...AUDIO_EXTS];
 
 export const extOf = (p) => path.extname(p).toLowerCase();
@@ -41,7 +42,7 @@ export async function probe(abs) {
   if (!probeCache.has(key)) {
     probeCache.set(
       key,
-      run(ffprobePath(), ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', '-show_chapters', abs], {
+      run(ffprobe(), ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', '-show_chapters', abs], {
         maxBuffer: 32 << 20,
       })
         .then(({ stdout }) => JSON.parse(stdout))
@@ -58,7 +59,7 @@ export async function probe(abs) {
 export const BITMAP_SUB_CODECS = new Set(['hdmv_pgs_subtitle', 'dvd_subtitle', 'dvb_subtitle', 'xsub']);
 
 export async function extractEmbeddedSub(abs, streamIndex) {
-  const { stdout } = await run(ffmpegPath(), ['-v', 'error', '-i', abs, '-map', `0:${streamIndex}`, '-f', 'ass', '-'], {
+  const { stdout } = await run(ffmpeg(), ['-v', 'error', '-i', abs, '-map', `0:${streamIndex}`, '-f', 'ass', '-'], {
     maxBuffer: 64 << 20,
   });
   return stdout;
@@ -85,22 +86,23 @@ const padded = (start, end) => {
   return { from: Math.max(0, start - p), length: end - start + 2 * p };
 };
 
-export async function clipAudio(abs, start, end, audioStream = null) {
+// `audio` is the ffmpeg map of the track the player is heard on (see playback.mjs playable()).
+export async function clipAudio(abs, start, end, audio = '0:a:0') {
   const { from, length } = padded(start, end);
   const file = tmp('a', '.mp3');
-  await run(ffmpegPath(), [
+  await run(ffmpeg(), [
     '-v', 'error', '-y', '-ss', String(from), '-t', String(length), '-i', abs,
-    '-map', audioStream == null ? '0:a:0' : `0:${audioStream}`, '-vn', '-c:a', 'libmp3lame', '-q:a', '4', file,
+    '-map', audio, '-vn', '-c:a', 'libmp3lame', '-q:a', '4', file,
   ]);
   return file;
 }
 
-export async function clipVideo(abs, start, end, audioStream = null) {
+export async function clipVideo(abs, start, end, audio = '0:a:0') {
   const { from, length } = padded(start, end);
   const file = tmp('v', '.mp4');
-  await run(ffmpegPath(), [
+  await run(ffmpeg(), [
     '-v', 'error', '-y', '-ss', String(from), '-t', String(length), '-i', abs,
-    '-map', '0:v:0', '-map', audioStream == null ? '0:a:0?' : `0:${audioStream}`,
+    '-map', '0:v:0', '-map', `${audio}?`,
     '-vf', 'scale=-2:480', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24', '-pix_fmt', 'yuv420p',
     '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', file,
   ]);
@@ -109,7 +111,7 @@ export async function clipVideo(abs, start, end, audioStream = null) {
 
 export async function screenshot(abs, start, end) {
   const file = tmp('i', '.jpg');
-  await run(ffmpegPath(), [
+  await run(ffmpeg(), [
     '-v', 'error', '-y', '-ss', String(Math.max(0, (start + end) / 2)), '-i', abs,
     '-frames:v', '1', '-vf', 'scale=-2:480', '-q:v', '4', file,
   ]);

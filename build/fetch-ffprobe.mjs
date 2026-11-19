@@ -1,5 +1,5 @@
-// Native arm64 ffprobe from the same ffmpeg-static release (b6.1.1) as the bundled ffmpeg;
-// ffprobe-static's darwin/arm64 binary is x86_64. Verified against GitHub's published sha256.
+// Native arm64 ffprobe from the same ffmpeg-static release (b6.1.1) as the bundled ffmpeg, whose
+// npm package ships no ffprobe. Verified against GitHub's published sha256.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';

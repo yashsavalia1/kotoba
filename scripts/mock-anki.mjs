@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url';
 
 const MEDIA_KINDS = ['audio', 'video', 'picture'];
 const mediaRef = (kind, filename) => (kind === 'picture' ? `<img src="${filename}">` : `[sound:${filename}]`);
+// Anki's duplicate check compares first fields with HTML stripped but media filenames kept.
+const stripHtml = (s) => s.replace(/<img[^>]*?\bsrc=["']?([^"'\s>]+)[^>]*>/gi, ' $1 ').replace(/<[^>]*>/g, '');
 
 /**
  * @param {object} [opts]
@@ -98,7 +100,10 @@ export function startMockAnki({ port = 0, permission = 'granted', version = 6, l
       if (
         !allowDup &&
         state.notes.some(
-          (o) => o.modelName === n.modelName && (!scopeDeck || o.deckName === n.deckName) && o.fields[m.fields[0]] === first
+          (o) =>
+            o.modelName === n.modelName &&
+            (!scopeDeck || o.deckName === n.deckName) &&
+            stripHtml(o.fields[m.fields[0]]) === stripHtml(first)
         )
       ) {
         throw new Error('cannot create note because it is a duplicate');

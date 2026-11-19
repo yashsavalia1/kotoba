@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { app, dialog, shell } from 'electron';
+import { app, clipboard, dialog, shell } from 'electron';
 import * as library from '../core/library.mjs';
+import * as browse from '../core/browse.mjs';
 import { tokenize } from '../core/dict.mjs';
 import { recordCues } from '../core/corpus.mjs';
-import { getSettings } from '../core/settings.mjs';
-import { isMediaFile } from '../core/media.mjs';
+import { getSettings, setLibraryRoot } from '../core/settings.mjs';
+import { extOf, isMediaFile } from '../core/media.mjs';
 import { SUB_EXTS } from '../core/subs.mjs';
 import { handle } from './ipc-util.mjs';
 
@@ -48,11 +49,13 @@ function firstMediaIn(dir, budget = { dirs: 200 }, depth = 0) {
 /**
  * Entry point for every way a file arrives: Finder, dock, argv, menu, dialog, drag-drop.
  * A folder opens its first item; the rest of it is reachable via siblings/adjacent.
- * Subtitle files arriving with media are attached to the first opened file.
+ * Subtitle files arriving with media are attached to the first opened file; files of
+ * any other type are refused with an evt:error.
  */
 export function openPaths(ctx, paths) {
   const records = [];
   const subs = [];
+  const refused = new Set();
   for (const p of cleanPaths(paths)) {
     const st = statSafe(p);
     if (!st) continue;
@@ -61,7 +64,11 @@ export function openPaths(ctx, paths) {
       continue;
     }
     const file = st.isDirectory() ? firstMediaIn(p) : p;
-    if (!file || !isMediaFile(file)) continue;
+    if (!file) continue;
+    if (!isMediaFile(file)) {
+      refused.add(extOf(file) || path.basename(file));
+      continue;
+    }
     try {
       const record = library.openMedia(file);
       if (!records.some((r) => r.id === record.id)) records.push(record);
@@ -70,6 +77,7 @@ export function openPaths(ctx, paths) {
       console.error('[kotoba] open failed:', file, e.message);
     }
   }
+  if (refused.size) ctx.send('evt:error', `Kotoba can't play ${[...refused].join(', ')} files.`);
   if (!records.length) return records;
   for (const s of subs) {
     try {
@@ -91,10 +99,10 @@ export function argvFiles(argv, cwd = process.cwd()) {
     .filter((a) => a !== appPath && fs.existsSync(a));
 }
 
-export async function openMediaDialog(ctx, { folders = false } = {}) {
+export async function openMediaDialog(ctx) {
   const res = await dialog.showOpenDialog(ctx.getWindow(), {
-    properties: folders ? ['openDirectory', 'multiSelections'] : ['openFile', 'multiSelections'],
-    filters: folders ? [] : [{ name: 'Media', extensions: ['*'] }],
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: 'Media', extensions: ['*'] }],
   });
   return res.canceled ? [] : openPaths(ctx, res.filePaths);
 }
@@ -143,6 +151,13 @@ export function registerLibraryIpc(ctx) {
     else if (fs.existsSync(path.dirname(abs))) shell.openPath(path.dirname(abs));
   });
 
+  handle('library:browse', (dir) => browse.browse(dir ?? null));
+  handle('library:markWatched', (p) => browse.markWatched(p));
+  handle('library:clearProgress', (p) => browse.clearProgress(p));
+  handle('library:forget', (p) => browse.forget(p));
+  handle('library:revealPath', (p) => shell.showItemInFolder(browse.checkPath(p)));
+  handle('library:copyPath', (p) => clipboard.writeText(browse.checkPath(p)));
+
   handle('subs:tracks', (id) => library.subtitleTracks(id));
   handle('subs:load', async (id, key) => {
     const { track, cues } = await library.loadSubtitleTrack(id, key);
@@ -157,7 +172,15 @@ export function registerLibraryIpc(ctx) {
   });
 
   handle('dialog:openMedia', () => openMediaDialog(ctx));
-  handle('dialog:openFolder', () => openMediaDialog(ctx, { folders: true }));
+  handle('dialog:libraryRoot', async () => {
+    const current = browse.libraryRoot();
+    const res = await dialog.showOpenDialog(ctx.getWindow(), {
+      title: 'Choose your media folder',
+      properties: ['openDirectory', 'createDirectory'],
+      ...(current ? { defaultPath: current } : {}),
+    });
+    return res.canceled ? null : setLibraryRoot(res.filePaths[0]);
+  });
   handle('dialog:attachSubtitle', async (id) => {
     const res = await dialog.showOpenDialog(ctx.getWindow(), {
       properties: ['openFile'],

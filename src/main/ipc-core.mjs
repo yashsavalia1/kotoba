@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import { app, safeStorage } from 'electron';
 import { dictReady, userDb } from '../core/db.mjs';
 import { getSettings, setSettings, setApiKey, getApiKey } from '../core/settings.mjs';
-import { ffmpegAvailable, resetFfmpegResolution } from '../core/ffmpeg.mjs';
 import { tokenize, lookup, glossText } from '../core/dict.mjs';
 import { corpusSize } from '../core/corpus.mjs';
 import { buildCards, CARD_TYPES, REQUIREMENTS } from '../core/cards.mjs';
@@ -53,7 +52,6 @@ export function registerCoreIpc() {
       version: app.getVersion(),
       platform: process.platform,
       dictReady: dictReady(),
-      ffmpeg: ffmpegAvailable(),
       anki,
       llm: llmAvailable(),
       hasStoredKey: Boolean(userDb().prepare('SELECT 1 FROM meta WHERE key = ?').get(KEY_META)),
@@ -65,11 +63,7 @@ export function registerCoreIpc() {
   });
 
   handle('settings:get', () => getSettings());
-  handle('settings:set', (patch) => {
-    const next = setSettings(patch);
-    if ('ffmpegPath' in patch || 'ffprobePath' in patch) resetFfmpegResolution();
-    return next;
-  });
+  handle('settings:set', (patch) => setSettings(patch));
   handle('settings:setApiKey', (key) => {
     saveApiKey(String(key ?? '').trim());
     return Boolean(getApiKey());
@@ -94,23 +88,27 @@ export function registerCoreIpc() {
   handle('cards:create', async (req) => {
     if (!Array.isArray(req?.types) || !req.types.length) throw new Error('Pick at least one card type');
     const { cards, skipped, files } = await buildCards(await cardRequest(req));
+    const allowDuplicate = Boolean(req.allowDuplicates) || !getSettings().warnDuplicates;
     const added = [];
     const failed = [...skipped];
+    // Cards Anki called duplicates; the card maker asks before adding them anyway.
+    const duplicates = [];
     const ins = userDb().prepare('INSERT INTO mined (word, type, media_id, cue, at) VALUES (?, ?, ?, ?, ?)');
     try {
       for (const card of cards) {
         try {
-          const noteId = await addNote(card.type, card.fields, card.media);
+          const noteId = await addNote(card.type, card.fields, card.media, [], { allowDuplicate });
           ins.run(req.word, card.type, req.mediaId, req.cueIndex ?? -1, Date.now());
           added.push({ type: card.type, noteId });
         } catch (e) {
-          failed.push({ type: card.type, reason: e.message });
+          if (e.code === 'duplicate') duplicates.push(card.type);
+          else failed.push({ type: card.type, reason: e.message });
         }
       }
     } finally {
       for (const f of files) fs.rmSync(f, { force: true });
     }
-    return { added, skipped: failed };
+    return { added, skipped: failed, duplicates };
   });
 
   handle('cards:minedWords', () =>
