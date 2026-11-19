@@ -1,0 +1,193 @@
+src/main/files.mjs
+  s_87fef2d75ac43e::t_3895ca89ee00b2 3,5,8,154-160,175-183
+  s_87fef2d75ac43e::t_43ec7ad2f86546 102,104-105
+  s_87fef2d75ac43e::t_9dae5c19637a3e 9,52-53,58,67-71,80
+test/playback.test.mjs
+  s_87fef2d75ac43e::t_55fad68017e35f 4,6-7,11-18,20-25,32-34,39,44
+  s_87fef2d75ac43e::t_1d5a740a6b1757 8,42,45
+  s_87fef2d75ac43e::t_fe80e059516ee9 28-31,35,38,40-41,43
+test/subs.test.mjs
+  s_87fef2d75ac43e::t_f8c5bf6c126e14 210
+scripts/make-fixtures.mjs
+  s_87fef2d75ac43e::t_6439500fd39d16 47
+  s_87fef2d75ac43e::t_e3deabab07a098 75
+  s_87fef2d75ac43e::t_f5181f053afc87 1-2,8,18-26,29-38,40,42-46,48-60,63-74,78
+e2e/peek.spec.mjs
+  s_87fef2d75ac43e::t_72fba74b325a2e 1-51
+e2e/library.spec.mjs
+  s_87fef2d75ac43e::t_9f6a5d1b072c30 1-2,4-60
+  s_87fef2d75ac43e::t_2dfa09fe1a4de8 3
+src/core/watch.mjs
+  s_87fef2d75ac43e::t_8848dd41be5ccf 1-28
+src/renderer/src/ui/Home.jsx
+  s_87fef2d75ac43e::t_22206e10435bf3 1,5-9,28-152,159-188,190-214,220-231,238-243,245-252,256-291,293-302,306
+  s_87fef2d75ac43e::t_f63f08bdee1cbd 292
+package.json
+  s_87fef2d75ac43e::t_efef22f06e674e 49,81
+test/titles.test.mjs
+  s_87fef2d75ac43e::t_258f8f5a6990b0 1-4,6,8-19,21-27,29-36,38-42,44-46,48-55,57-60,62-64,66-68,70-90
+src/renderer/src/ui/CardMaker.jsx
+  s_87fef2d75ac43e::t_d2a1fbfa610f9c 41,49-50,87-99,108-115,257-262,264-274
+  s_87fef2d75ac43e::t_1d32c1ff60deff 263
+e2e/ipc.spec.mjs
+  s_87fef2d75ac43e::t_4a1f590220196e 89-104,110-132
+  s_87fef2d75ac43e::t_e603f5a1346863 105-109
+  s_87fef2d75ac43e::t_f9a0b4d396c4f9 4,18,21,39-54
+  s_87fef2d75ac43e::t_6caa66d2af5947 55-56
+src/main/protocol.mjs
+  s_87fef2d75ac43e::t_448e4aa94ab2b8 4,7,26
+  s_87fef2d75ac43e::t_3895ca89ee00b2 8-10,77-78,80-82,84,86,97-98
+  s_87fef2d75ac43e::t_c6f6b76553eb5b 19,21
+src/core/ffmpeg.mjs
+  s_87fef2d75ac43e::t_b8b473621722d4 5-11,14-16,19-20
+src/core/cards.mjs
+  s_87fef2d75ac43e::t_a04877dadab737 6-7,134,138
+  s_87fef2d75ac43e::t_1d5a740a6b1757 139-142,144,146
+  s_87fef2d75ac43e::t_e348384d9b31e0 160
+scripts/verify-playback.mjs
+  s_87fef2d75ac43e::t_21b31945ce50f3 47
+  s_87fef2d75ac43e::t_75fd57c30dd893 2-3
+  s_87fef2d75ac43e::t_b49837fa2f68b2 1,4-5,13,21,23,26,28-30,32-42,45-46,48-53,59-69,74
+e2e/packaging.spec.mjs
+  s_87fef2d75ac43e::t_b1b04a327e901d 3,19,35,46
+src/core/settings.mjs
+  s_87fef2d75ac43e::t_20f635b73ff7ea 13-20,32,36-41,43-44,46,49
+  s_87fef2d75ac43e::t_cfcc41904b3db6 12
+  s_87fef2d75ac43e::t_0a0329841c26bc 25-26
+  s_87fef2d75ac43e::t_73b500883dc4c6 50
+src/renderer/src/ui/Shortcuts.jsx
+  s_87fef2d75ac43e::t_de986ca95aa228 24
+  s_87fef2d75ac43e::t_43ec7ad2f86546 30
+  s_87fef2d75ac43e::t_07634e6164d080 25
+README.md
+  s_87fef2d75ac43e::t_91acf596c9ba28 3-4,21-22,28-29,78-82,84
+  s_87fef2d75ac43e::t_3142f09b66f390 91,94-99,101-107,109-118,187-190,192-198
+  s_87fef2d75ac43e::t_ee71572c1439cd 85-86
+  s_87fef2d75ac43e::t_3c82979e007e39 207-209,211,214-215,218-220,233-234
+src/renderer/src/ui/Settings.jsx
+  s_87fef2d75ac43e::t_cfcc41904b3db6 123
+  s_87fef2d75ac43e::t_43ec7ad2f86546 22
+  s_87fef2d75ac43e::t_1fbcf654dbe0e0 19,26,85-108
+  s_87fef2d75ac43e::t_07634e6164d080 151
+  s_87fef2d75ac43e::t_64e9a56aca8ddf 12,15,20
+test/watch.test.mjs
+  s_87fef2d75ac43e::t_0acd00ae525785 1-58,60-92
+  s_87fef2d75ac43e::t_3bb709e13f9d23 59
+CLAUDE.md
+  s_87fef2d75ac43e::t_a2fadf05548c91 1-3
+src/renderer/src/ui/Player.jsx
+  s_87fef2d75ac43e::t_a0e7715a9cc5ce 1
+  s_87fef2d75ac43e::t_17932c993a8d43 162-164
+  s_87fef2d75ac43e::t_fe80e059516ee9 242,643-644
+  s_87fef2d75ac43e::t_59e6ab96a11f4b 7,188-189,495,653-654,656-658,661-662,668-669,694-702
+  s_87fef2d75ac43e::t_de986ca95aa228 196,319,433,582-583,605-616,635-641,709,784
+  s_87fef2d75ac43e::t_de6a503acbd40a 326-327
+src/renderer/src/ui/Subtitles.jsx
+  s_87fef2d75ac43e::t_6f7cdb588c04ab 44-50,53-54,57,78-83,86-105,110-121,134,142-144
+  s_87fef2d75ac43e::t_10f39a205bfe45 84-85
+build/fetch-ffprobe.mjs
+  s_87fef2d75ac43e::t_6e447d437a9f5f 1-2
+src/core/media.mjs
+  s_87fef2d75ac43e::t_a04877dadab737 89-90,95,100,105
+  s_87fef2d75ac43e::t_d8cbfa3bdd95c7 8,12-14,45,62,93,103,114
+src/core/anki.mjs
+  s_87fef2d75ac43e::t_cfcc41904b3db6 252,254,262
+src/renderer/src/ui/theme.css
+  s_87fef2d75ac43e::t_6f7cdb588c04ab 230-234
+  s_87fef2d75ac43e::t_627857d0a5593e 105-109,111-120,122-127,129-143,145-147,149-151,153
+  s_87fef2d75ac43e::t_aa1f6de849c142 152
+  s_87fef2d75ac43e::t_eb7065d7af8b15 174-175
+  s_87fef2d75ac43e::t_43ec7ad2f86546 350-356
+  s_87fef2d75ac43e::t_64e9a56aca8ddf 357-359
+  s_87fef2d75ac43e::t_cfb3d7dcdb6374 144
+src/renderer/src/ui/App.jsx
+  s_87fef2d75ac43e::t_cf94bb55245242 58,103,157-158,165-166
+  s_87fef2d75ac43e::t_cfcc41904b3db6 241
+  s_87fef2d75ac43e::t_4971102133fc31 167
+  s_87fef2d75ac43e::t_a3333c833ffca3 16-19,24,49,65-75,81,89,92-93,96,222-225,245
+  s_87fef2d75ac43e::t_031a6a97498f5f 94
+src/renderer/src/api/library.js
+  s_87fef2d75ac43e::t_561bc86e135efc 14-22
+  s_87fef2d75ac43e::t_2c15f8e02a37bb 23
+test/library.test.mjs
+  s_87fef2d75ac43e::t_283956fbc5084b 11,32,334-335,337
+  s_87fef2d75ac43e::t_8325e8f5990346 280
+src/main/main.mjs
+  s_87fef2d75ac43e::t_33f1d1264d8f19 11,26,87
+src/main/ipc-core.mjs
+  s_87fef2d75ac43e::t_cfcc41904b3db6 91,94-95,100,104-105,111
+  s_87fef2d75ac43e::t_6a80b5c20e2a32 66
+src/core/browse.mjs
+  s_87fef2d75ac43e::t_9dae5c19637a3e 115
+  s_87fef2d75ac43e::t_8bd197d9349bc8 109
+  s_87fef2d75ac43e::t_edeccc6869f225 1-51,53-106,108,110-114,116-170,176-190
+  s_87fef2d75ac43e::t_f63f08bdee1cbd 52,107
+  s_87fef2d75ac43e::t_a9e14c84567af0 171-175
+scripts/mock-anki.mjs
+  s_87fef2d75ac43e::t_e5359043ed6aa0 12-13
+  s_87fef2d75ac43e::t_530a638361b4a9 103-106
+docs/ARCHITECTURE.md
+  s_87fef2d75ac43e::t_740a4608384dbf 12-13,19,33,44-46,87,91-103,131,143,145,148
+  s_87fef2d75ac43e::t_8de36445288a34 134
+  s_87fef2d75ac43e::t_52ccb5ad3ed614 104-105
+  s_87fef2d75ac43e::t_fb7032770b8bfb 106-109
+  s_87fef2d75ac43e::t_d5f001e0de4669 14-18,58-76,83-84,139-141,147
+  s_87fef2d75ac43e::t_aa1f6de849c142 142
+  s_87fef2d75ac43e::t_71f4a6b9134e98 35,124-125
+  s_87fef2d75ac43e::t_46171dad07bad5 126
+src/core/titles.mjs
+  s_87fef2d75ac43e::t_6c81e801f8cb27 1-126
+src/core/db.mjs
+  s_87fef2d75ac43e::t_d4de36412be37d 38-40,102,107-118
+  s_87fef2d75ac43e::t_79c744d888adb2 119-120
+src/core/library.mjs
+  s_87fef2d75ac43e::t_97d60149bf5515 309
+  s_87fef2d75ac43e::t_0303a481f4f067 9,18,26,35,58,62,65,130-133,135-137,140,142-144
+  s_87fef2d75ac43e::t_733a872692cb95 138-139,141
+src/main/log.mjs
+  s_87fef2d75ac43e::t_8b933eb5e25980 1-36
+src/renderer/src/main.jsx
+  s_87fef2d75ac43e::t_33f1d1264d8f19 6-29
+e2e/player.spec.mjs
+  s_87fef2d75ac43e::t_cc980a267fb8e5 5-11,22,85-116,118,120-134,137-141
+  s_87fef2d75ac43e::t_f9950d0c9a7df5 117
+  s_87fef2d75ac43e::t_75cb1865abb6c4 119
+  s_87fef2d75ac43e::t_0ede91e9e0de2f 65-68,142-147
+src/core/thumbs.mjs
+  s_87fef2d75ac43e::t_42e557f0889fdf 47-48,70
+  s_87fef2d75ac43e::t_71d4a8b26b8b67 74
+  s_87fef2d75ac43e::t_409fd142a5572a 7,50
+  s_87fef2d75ac43e::t_156f6eb73eba10 1-6,8-46,49,51-69,71-73,75-91
+test/browse.test.mjs
+  s_87fef2d75ac43e::t_ae9f3fc4023afd 9,143-147
+  s_87fef2d75ac43e::t_38b89fa2b9701f 1-8,11-50,53-67,69-83,88,90-126,128-142,148-151,153-164
+  s_87fef2d75ac43e::t_8bd197d9349bc8 51-52,84-87,89,127
+  s_87fef2d75ac43e::t_283956fbc5084b 10,152
+  s_87fef2d75ac43e::t_8325e8f5990346 68
+src/core/playback.mjs
+  s_87fef2d75ac43e::t_597e0eab969f3f 32,37-39,48-49
+  s_87fef2d75ac43e::t_41d510f578f7e2 3,5,8-9,11-16,18,20-21
+  s_87fef2d75ac43e::t_a04877dadab737 43
+  s_87fef2d75ac43e::t_7c868cc79eaf99 6-7,31,34-36,40-42,44-47,50-54,61
+test/cards.test.mjs
+  s_87fef2d75ac43e::t_1d5a740a6b1757 334,341
+  s_87fef2d75ac43e::t_4a1f590220196e 12-14,353-374
+  s_87fef2d75ac43e::t_283956fbc5084b 9,21,152,317,327,336-338,340
+  s_87fef2d75ac43e::t_fdefaaa49a24d8 375
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ec81981bfb40990b5dd4a29851b5ccb0a4041ffe",
+  "prompts": {},
+  "sessions": {
+    "s_87fef2d75ac43e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29db1b8e-af83-4b10-908b-372aabf84dfe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Yash Savalia <yashsavalia1@gmail.com>"
+    }
+  }
+}
