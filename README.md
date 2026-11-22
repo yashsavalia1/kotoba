@@ -9,6 +9,28 @@ the subtitles you have already watched, so they cost nothing and work offline.
 
 ---
 
+## Download
+
+Every merge to `main` builds the installers and publishes them on the
+**[latest release](https://github.com/yashsavalia1/kotoba/releases/latest)**:
+
+| | |
+|---|---|
+| macOS, Apple Silicon | `Kotoba-<version>-mac-arm64.dmg` |
+| Windows, x64 | `Kotoba-<version>-win-x64.exe` |
+| Linux, x64 | `Kotoba-<version>-linux-x86_64.AppImage` |
+
+The dictionary and ffmpeg are inside the app; nothing else to install. Anki cards need
+Anki running with the [AnkiConnect](https://ankiweb.net/shared/info/2055492159) add-on.
+
+The builds aren't signed with a paid certificate, so the first launch takes one extra step:
+
+- **macOS:** open the app once, then System Settings › Privacy & Security › *Open Anyway*.
+- **Windows:** on the SmartScreen prompt, *More info* › *Run anyway*.
+- **Linux:** `chmod +x Kotoba-*.AppImage`, then run it.
+
+---
+
 ## Why this is an app and not a VLC plugin
 
 VLC rasterises subtitles into a bitmap before the video output blends them. By

@@ -102,10 +102,10 @@ There is no media cache: Chromium plays the files themselves; only library thumb
 - The player shows a file it plays nothing of as an error in place of the video, and toasts the
   reason for a file it plays only part of.
 - ffmpeg is internal, for the jobs `<video>` can't do (Chromium's own FFmpeg isn't reachable from
-  JS): ffprobe for streams and chapters, ffmpeg for embedded text subtitles, card clips (the first
-  audio track), screenshots and thumbnails. Packaged, the binaries are
+  JS): ffprobe for streams and chapters, ffmpeg for embedded text subtitles, card clips (from the
+  audio track that plays), screenshots and thumbnails. Packaged, the binaries are
   `Resources/app.asar.unpacked/node_modules/ffmpeg-static/ffmpeg` and `Resources/bin/ffprobe`;
-  dev and tests use the same repo copies (`node_modules/ffmpeg-static`, `build/ffprobe-darwin-arm64`
+  dev and tests use the same repo copies (`node_modules/ffmpeg-static`, `build/ffprobe-<platform>-<arch>`
   from `node build/fetch-ffprobe.mjs`). No setting, env var or PATH.
 
 ## Environment variables (dev / test)
@@ -147,3 +147,13 @@ Events main → renderer: `evt:open-media { id, ids }`, `evt:command <name>`, `e
 A media record: `{ id, path, title, folder, size, duration, addedAt, lastOpenedAt, position, prefs, watched, exists }`.
 `prefs` is free-form per-media state: `subTrack`, `refTrack`, `subDelayMs`, `rate`.
 Subtitle track keys are stable strings: `file:<abs path>` or `stream:<ffprobe stream index>`.
+
+## Releases
+
+`.github/workflows/release.yml` runs on every push to `main`. A Linux job builds the
+dictionary (cached for a week, keyed on the build scripts) and passes `build/dict.db` on.
+macOS (arm64 dmg), Windows (x64 NSIS installer) and Linux (x64 AppImage) jobs then fetch
+their platform's ffprobe and package with `electron-builder --publish never`. The Linux job
+also runs the unit tests. A last job publishes the installers as release
+`v<major>.<minor>.<run number>`, with the version stamped into the app through
+`-c.extraMetadata.version`. Builds are ad-hoc signed on macOS and unsigned on Windows.

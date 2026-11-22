@@ -1,0 +1,105 @@
+# Every push to main builds the macOS, Windows and Linux installers and publishes them as a
+# GitHub release tagged v<major>.<minor>.<run number> (major.minor from package.json).
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+jobs:
+  dictionary:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - id: version
+        run: echo "version=$(node -p "require('./package.json').version.split('.').slice(0, 2).join('.')").${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+      # JMdict updates weekly; rebuilding at most once a week keeps most runs to a cache restore.
+      - id: week
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+      - id: cache
+        uses: actions/cache@v6
+        with:
+          path: build/dict.db
+          key: dict-${{ steps.week.outputs.week }}-${{ hashFiles('scripts/build-dict.mjs', 'scripts/pack-dict.mjs') }}
+      - if: steps.cache.outputs.cache-hit != 'true'
+        run: npm run dict && npm run pack-dict
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dict
+          path: build/dict.db
+          retention-days: 1
+
+  build:
+    needs: dictionary
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: --mac
+          - os: windows-latest
+            platform: --win
+          - os: ubuntu-latest
+            platform: --linux
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v8
+        with:
+          name: dict
+          path: build
+      - run: node build/fetch-ffprobe.mjs
+      - name: Unit tests
+        if: runner.os == 'Linux'
+        run: npm test
+        env:
+          KOTOBA_DICT_DB: build/dict.db
+      - run: npm run build
+      - run: npx electron-builder ${{ matrix.platform }} --publish never -c.extraMetadata.version=${{ needs.dictionary.outputs.version }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: installer-${{ runner.os }}
+          path: |
+            dist/*.dmg
+            dist/*.exe
+            dist/*.AppImage
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: [dictionary, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: installer-*
+          path: dist
+          merge-multiple: true
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.dictionary.outputs.version }}
+        run: |
+          gh release create "v$VERSION" dist/* \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Kotoba $VERSION" --generate-notes --latest

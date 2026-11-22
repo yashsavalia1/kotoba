@@ -1,9 +1,12 @@
 {
   "name": "kotoba",
   "version": "0.1.0",
+  "description": "Sentence mining from your own media: a hover dictionary over subtitles and Anki cards in twelve types.",
+  "author": {
+    "name": "Yash Savalia"
+  },
   "private": true,
   "type": "module",
-  "description": "Sentence mining for your own media: a desktop player with hover dictionary and Anki cards.",
   "scripts": {
     "dev": "concurrently -k -n web,app -c magenta,cyan \"vite --config vite.config.mjs\" \"KOTOBA_RENDERER_URL=http://localhost:${KOTOBA_VITE_PORT:-5173} electron .\"",
     "build": "vite build --config vite.config.mjs",
@@ -13,7 +16,7 @@
     "shot": "node scripts/shot.mjs",
     "mock-anki": "node --no-warnings scripts/mock-anki.mjs",
     "pack-dict": "node --no-warnings scripts/pack-dict.mjs",
-    "dist": "node build/fetch-ffprobe.mjs && npm run build && npm run pack-dict && electron-builder --mac --arm64",
+    "dist": "node build/fetch-ffprobe.mjs && npm run build && npm run pack-dict && electron-builder",
     "e2e": "playwright test --project=dev"
   },
   "dependencies": {
@@ -49,7 +52,7 @@
       "package.json"
     ],
     "asarUnpack": [
-      "node_modules/ffmpeg-static/ffmpeg"
+      "node_modules/ffmpeg-static/ffmpeg*"
     ],
     "extraResources": [
       {
@@ -57,8 +60,8 @@
         "to": "dict.db"
       },
       {
-        "from": "build/ffprobe-darwin-arm64/ffprobe",
-        "to": "bin/ffprobe"
+        "from": "build/ffprobe-${platform}-${arch}",
+        "to": "bin"
       }
     ],
     "fileAssociations": [
@@ -122,6 +125,33 @@
     "electronLanguages": [
       "en",
       "ja"
-    ]
+    ],
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "AudioVideo",
+      "icon": "build/icon.png"
+    }
   }
 }
